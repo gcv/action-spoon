@@ -1,0 +1,34 @@
+* Backup Spoon — a Hammerspoon Plugin
+
+Backup Spoon (or Backup.spoon) is a [[http://www.hammerspoon.org/][Hammerspoon]] [[https://www.hammerspoon.org/Spoons/][plugin, or Spoon]], for orchestrating command-line backup utilities like [[https://restic.net/][restic]], [[https://www.borgbackup.org/][Borg]], and [[https://kopia.io][Kopia]]. These utilities can even be configured to run simultaneously to provide extra redundancy, since all have been known to have [[https://forum.restic.net/t/recovery-options-for-damaged-repositories/1571][data-loss]] bugs.
+
+
+** Tasks
+
+- [ ] get it working
+- [ ] adjust icon size, it's currently too big?
+- [ ] get Restic and Kopia both working
+
+
+** Installation
+
+- Install your backup utility of choice.
+- Download the latest release zip file from https://github.com/gcv/backup-spoon/releases/.
+- Open the downloaded file, and Hammerspoon will automatically install it.
+- Edit your Hammerspoon configuration file (~~/.hammerspoon/init.lua~), and add the following line:
+
+#+BEGIN_SRC lua
+hs.loadSpoon("Backup")
+#+END_SRC
+
+After editing the configuration file (see below), reload the Hammerspoon configuration.
+
+
+** Configuration
+
+*** S3 infrequent access policy
+
+Kopia: blobs starting with ~p~ can be marked infrequent for savings (https://kopia.discourse.group/t/using-s3-infrequent-access-policies/187/2).
+
+
+** Usage
