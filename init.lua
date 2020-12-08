@@ -29,7 +29,6 @@ local BackupSet = dofile(obj.spoonPath .. "/backup-set.lua")
 --- Internal state:
 obj.confFile = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/BackupSpoon.lua"
 obj.conf = {}
-obj.env = {}
 obj.sets = {}
 obj.active = false
 obj.watcher = nil
@@ -90,25 +89,20 @@ function obj:init()
       self.conf.debug = false
    end
    -- process root environment variables
-   self.env = Utils.readEnvs(self.conf.environment)
-   -- -- process conf file: for each backup set, create a new BackupSet object
-   -- for idx, set in ipairs(self.conf.sets) do
-   --    -- local path = "string" == type(repo) and repo or repo.path
-   --    -- local interval = ("table" == type(repo) and repo.interval) and repo.interval or self.conf.interval
-   --    if "table" == type(repo) and repo.excludes then
-   --       if "table" == type(repo.excludes) then
-   --          -- join excludes using the bell character \a, since it's unlikely to
-   --          -- be used in file names, and both Lua and bash can handle it
-   --          excludes = table.concat(repo.excludes, "\a")
-   --       else
-   --          excludes = repo.excludes
-   --       end
-   --    end
-   --    self.syncs[#self.syncs+1] = Sync.new(path, interval, excludes)
-   -- end
-   -- if 0 == #self.sets then
-   --    self:notify("error", "No backup sets defined. Check configuration.")
-   -- end
+   self.conf.env = Utils.readEnvs(self.conf.environment)
+   -- process conf file: for each backup set, create a new BackupSet object
+   for idx, set in ipairs(self.conf.sets) do
+      local id = set.id
+      local interval_backup = set.interval_backup or self.conf.interval_backup
+      local interval_prune = set.interval_prune or self.conf.interval_prune
+      local env = Utils.merge(self.conf.env, Utils.readEnvs(set.environment))
+      local backups = set.backups
+      self.sets[#self.sets+1] = BackupSet.new(
+         id, interval_backup, interval_prune, env, backups)
+   end
+   if 0 == #self.sets then
+      self:notify("error", "No backup sets defined. Check configuration.")
+   end
    -- set up menu icon
    self.menu = hs.menubar.new()
    self:updateMenuIcon()

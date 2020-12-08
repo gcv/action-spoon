@@ -1,11 +1,14 @@
 local obj = { name = "BackupSet" }
 obj.__index = obj
 
-function obj.new(displayPath, interval)
+function obj.new(id, interval_backup, interval_prune, env, backups)
    local self = {
-      displayPath = displayPath,
-      interval = interval,
-      lastBackup = nil,
+      id = id,
+      interval_backup = interval_backup,
+      interval_prune = interval_prune,
+      env = env,
+      backups = backups,
+      lastRun = nil,
       status = nil,
       started = nil,
       timer = nil,

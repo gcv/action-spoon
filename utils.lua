@@ -65,4 +65,12 @@ function obj.readEnvs(desc)
    return envs
 end
 
+function obj.merge(t1, t2)
+   local res = hs.fnutils.copy(t1)
+   for k, v in pairs(t2) do
+      res[k] = v
+   end
+   return res
+end
+
 return obj
