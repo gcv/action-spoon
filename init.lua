@@ -106,7 +106,7 @@ function obj:init()
    -- set up menu icon
    self.menu = hs.menubar.new()
    self:updateMenuIcon()
-   --self.menu:setMenu(self.makeMenuTable)
+   self.menu:setMenu(self.makeMenuTable)
    -- -- activate system watcher
    -- self.watcher = hs.caffeinate.watcher.new(
    --    function(evt)
@@ -114,7 +114,7 @@ function obj:init()
    --    end
    -- )
    -- -- go
-   -- self:start()
+   self:start()
    return self
 end
 
@@ -129,9 +129,9 @@ end
 ---  * None
 function obj:start()
    obj.active = true
-   -- for idx, set in ipairs(obj.sets) do
-   --    set:start()
-   -- end
+   for idx, set in ipairs(obj.sets) do
+      set:start()
+   end
    -- obj.watcher:start()
    obj:updateMenuIcon()
 end
@@ -147,11 +147,36 @@ end
 ---  * None
 function obj:stop()
    -- obj.watcher:stop()
-   -- for idx, set in ipairs(obj.sets) do
-   --    set:stop()
-   -- end
-   -- obj.active = false
+   for idx, set in ipairs(obj.sets) do
+      set:stop()
+   end
+   obj.active = false
    obj:updateMenuIcon()
+end
+
+function obj:makeMenuTable()
+   local res = {}
+   res[#res+1] = { title = "-" }
+   for idx, set in ipairs(obj.sets) do
+      res[#res+1] = set:display()
+   end
+   res[#res+1] = { title = "-" }
+   if obj.active then
+      res[#res+1] = {
+         title = "Disable",
+         fn = function()
+            obj.stop()
+         end
+      }
+   else
+      res[#res+1] = {
+         title = "Enable",
+         fn = function()
+            obj.start()
+         end
+      }
+   end
+   return res
 end
 
 function obj:updateMenuIcon()
