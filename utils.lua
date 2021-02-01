@@ -53,13 +53,13 @@ function obj.readEnvs(desc)
             if resStatus then
                envs[env.var] = obj.trim(resOutput)
             else
-               self:notify("error", "Failed command " .. realCmd)
+               obj.app:notify("error", "Failed command " .. realCmd)
             end
          else
-            self:notify("error", "Misconfigured command for " .. env.var)
+            obj.app:notify("error", "Misconfigured command for " .. env.var)
          end
       else
-         self:notify("error", "Misconfigured root environment for " .. env.var)
+         obj.app:notify("error", "Misconfigured root environment for " .. env.var)
       end
    end
    return envs
