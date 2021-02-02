@@ -29,6 +29,7 @@ local BackupSet = dofile(obj.spoonPath .. "/backup-set.lua")
 --- Internal state:
 obj.confFile = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/BackupSpoon.lua"
 obj.conf = {}
+obj.state = {}
 obj.sets = {}
 obj.active = false
 obj.watcher = nil
@@ -68,10 +69,13 @@ function obj:init()
    --self:versionCheck()
    -- configure helper object prototypes
    Utils.app = self
+   self.Utils = Utils
    BackupSet.app = self
    -- process conf file: sensible defaults
    if not self.conf.state_file then
-      self.conf.state_file = "~/.config/BackupSpoon-state.lua"
+      self.conf.state_file = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/BackupSpoon-state.lua"
+   else
+      -- FIXME: Resolve ~ in whatever is given here.
    end
    if not self.conf.path then
       self.conf.path = { "/bin", "/usr/bin", "/usr/local/bin" }
@@ -103,6 +107,8 @@ function obj:init()
    if 0 == #self.sets then
       self:notify("error", "No backup sets defined. Check configuration.")
    end
+   -- process state file
+   self:stateFileRead()
    -- set up menu icon
    self.menu = hs.menubar.new()
    self:updateMenuIcon()
@@ -161,6 +167,13 @@ function obj:makeMenuTable()
       res[#res+1] = set:display()
    end
    res[#res+1] = { title = "-" }
+   res[#res+1] = {
+      title = "Debug...",
+      fn = function()
+         print("State:", hs.inspect(obj.state))
+         print("Sets:", hs.inspect(obj.sets))
+      end
+   }
    if obj.active then
       res[#res+1] = {
          title = "Disable",
@@ -210,6 +223,30 @@ function obj:notify(kind, text)
       }
    )
    msg:send()
+end
+
+function obj:stateFileRead()
+   local stateFileFn, err = loadfile(obj.conf.state_file, "t", obj.state)
+   if stateFileFn then
+      stateFileFn()
+   else
+      -- state file missing, this is fine
+   end
+   -- reconcile the state file with the configuration
+   for idxSet, set in ipairs(obj.sets) do
+      if obj.state[set.id] then
+         if obj.state[set.id].lastRun then
+            set.lastRun = obj.state[set.id].lastRun
+         end
+         if obj.state[set.id].lastPrune then
+            set.lastPrune = obj.state[set.id].lastPrune
+         end
+      end
+   end
+end
+
+function obj:stateFileWrite()
+   -- FIXME
 end
 
 return obj

@@ -9,9 +9,12 @@ function obj.new(id, interval_backup, interval_prune, env, backups)
       env = env,
       backups = backups,
       lastRun = nil,
+      lastPrune = nil,
       status = nil,
-      started = nil,
-      timer = nil,
+      startedBackup = nil,
+      startedPrune = nil,
+      timerBackup = nil,
+      timerPrune = nil,
       task = nil
    }
    setmetatable(self, obj)
@@ -51,15 +54,22 @@ function obj:display()
       resTitle = resTitle .. "•"
    end
    -- path
-   resTitle = resTitle .. " " .. self.id
+   resTitle = resTitle .. " " .. self.id .. ": " ..
+      -- join visible titles of all backups in the set
+      table.concat(self.app.Utils.map(
+                      function (b)
+                         return b.id
+                      end,
+                      self.backups),
+                   ", ")
    -- last and next backup
    nextStr = ""
-   if self.timer then
-      nextStr = "; next: " .. os.date(fmt, math.floor(os.time() + self.timer:nextTrigger()))
+   if self.timerBackup then
+      nextStr = "; next: " .. os.date(fmt, math.floor(os.time() + self.timerBackup:nextTrigger()))
    end
    if self.lastSync then
       resTitle = resTitle .. " (last: " .. os.date(fmt, self.lastSync) .. nextStr .. ")"
-   elseif self.started then
+   elseif self.startedBackup then
       resTitle = resTitle .. nextStr
    end
    -- done
