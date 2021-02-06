@@ -83,11 +83,17 @@ function obj:init()
    if not self.conf.exclude_wifi_networks then
       self.conf.exclude_wifi_networks = {}
    end
-   if not self.conf.interval_backup then
-      self.conf.interval_backup = "1 hour"
+   if not self.conf.intervals then
+      self.conf.intervals = {
+         backup = 60 * 60,          -- 1 hour
+         prune = 60 * 60 * 24 * 30, -- 30 days
+      }
    end
-   if not self.conf.interval_prune then
-      self.conf.interval_prune = "1 month"
+   if not self.conf.intervals.backup then
+      self.conf.intervals.backup = 60 * 60           -- 1 hour
+   end
+   if not self.conf.intervals.prune then
+      self.conf.intervals.prune = 60 * 60 * 24 * 30  -- 30 days
    end
    if not self.conf.debug then
       self.conf.debug = false
@@ -97,12 +103,12 @@ function obj:init()
    -- process conf file: for each backup set, create a new BackupSet object
    for idx, set in ipairs(self.conf.sets) do
       local id = set.id
-      local interval_backup = set.interval_backup or self.conf.interval_backup
-      local interval_prune = set.interval_prune or self.conf.interval_prune
+      local intervals = set.intervals or self.conf.intervals
+      intervals.backup = intervals.backup or self.conf.intervals.backup
+      intervals.prune = intervals.prune or self.conf.intervals.prune
       local env = Utils.merge(self.conf.env, Utils.readEnvs(set.environment))
       local backups = set.backups
-      self.sets[#self.sets+1] = BackupSet.new(
-         id, interval_backup, interval_prune, env, backups)
+      self.sets[#self.sets+1] = BackupSet.new(id, intervals, env, backups)
    end
    if 0 == #self.sets then
       self:notify("error", "No backup sets defined. Check configuration.")
@@ -164,7 +170,10 @@ function obj:makeMenuTable()
    local res = {}
    res[#res+1] = { title = "-" }
    for idx, set in ipairs(obj.sets) do
-      res[#res+1] = set:display()
+      local displayItems = set:display()
+      for _, displayItem in ipairs(displayItems) do
+         res[#res+1] = displayItem
+      end
    end
    res[#res+1] = { title = "-" }
    res[#res+1] = {

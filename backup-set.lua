@@ -1,14 +1,13 @@
 local obj = { name = "BackupSet" }
 obj.__index = obj
 
-function obj.new(id, interval_backup, interval_prune, env, backups)
+function obj.new(id, intervals, env, backups)
    local self = {
       id = id,
-      interval_backup = interval_backup,
-      interval_prune = interval_prune,
+      intervals = intervals,
       env = env,
       backups = backups,
-      lastRun = nil,
+      lastBackup = nil,
       lastPrune = nil,
       status = nil,
       startedBackup = nil,
@@ -22,8 +21,35 @@ function obj.new(id, interval_backup, interval_prune, env, backups)
 end
 
 function obj:start()
-   if self.app.conf.debug then print("BackupSpoon:", "starting periodic backup for set '" .. self.id .. "'") end
+   if self.app.conf.debug then print("BackupSpoon:", "starting timers for set '" .. self.id .. "'") end
+   self:startBackup()
+   self:startPrune()
+end
 
+function obj:startBackup()
+   self.timerBackup = hs.timer.new(
+      self.intervals.backup,
+      function()
+         self:goBackup()
+      end,
+      true -- continueOnError
+   )
+   self.startedBackup = os.time()
+   self.status = nil
+   self.timerBackup:start()
+end
+
+function obj:startPrune()
+   self.timerPrune = hs.timer.new(
+      self.intervals.prune,
+      function()
+         self:goPrune()
+      end,
+      true -- continueOnError
+   )
+   self.startedPrune = os.time()
+   self.status = nil
+   self.timerPrune:start()
 end
 
 function obj:pause()
@@ -35,26 +61,34 @@ end
 function obj:stop()
 end
 
-function obj:go()
+function obj:goBackup()
+   if self.app.conf.debug then print("BackupSpoon:", "backup trigger for set '" .. self.id .. "'") end
+   
+end
+
+function obj:goPrune()
+   if self.app.conf.debug then print("BackupSpoon:", "prune trigger for set '" .. self.id .. "'") end
+
 end
 
 function obj:display()
-   local fmt = "%X" -- equivalent to "%H:%M:%S"
-   local resTitle = ""
+   local res = {}
+   local fmt = "%Y-%m-%d (%a) %X" -- equivalent to "%H:%M:%S"
+   local setTitle = ""
    -- status
    if "ok" == self.status then
-      resTitle = resTitle .. "✓"
+      setTitle = setTitle .. "✓"
    elseif "error" == self.status then
-      resTitle = resTitle .. "!"
+      setTitle = setTitle .. "!"
    elseif "running" == self.status then
-      resTitle = resTitle .. "⟳"
+      setTitle = setTitle .. "⟳"
    elseif "stopped" == self.status then
-      resTitle = resTitle .. "×"
+      setTitle = setTitle .. "×"
    else
-      resTitle = resTitle .. "•"
+      setTitle = setTitle .. "•"
    end
    -- path
-   resTitle = resTitle .. " " .. self.id .. ": " ..
+   setTitle = setTitle .. " " .. self.id .. ": " ..
       -- join visible titles of all backups in the set
       table.concat(self.app.Utils.map(
                       function (b)
@@ -62,24 +96,40 @@ function obj:display()
                       end,
                       self.backups),
                    ", ")
-   -- last and next backup
-   nextStr = ""
-   if self.timerBackup then
-      nextStr = "; next: " .. os.date(fmt, math.floor(os.time() + self.timerBackup:nextTrigger()))
-   end
-   if self.lastSync then
-      resTitle = resTitle .. " (last: " .. os.date(fmt, self.lastSync) .. nextStr .. ")"
-   elseif self.startedBackup then
-      resTitle = resTitle .. nextStr
-   end
-   -- done
-   return {
-      title = resTitle,
+   res[#res+1] = {
+      title = setTitle,
       disabled = ("running" == self.status),
       fn = function()
-         self:go()
+         self:goBackup()
       end
    }
+   -- additional information
+   if self.timerBackup then
+      res[#res+1] = {
+         title = "   - next backup: " .. os.date(fmt, math.floor(os.time() + self.timerBackup:nextTrigger())),
+         disabled = true
+      }
+   end
+   if self.lastBackup then
+      res[#res+1] = {
+         title = "   - last backup: " .. os.date(fmt, self.lastBackup),
+         disabled = true
+      }
+   end
+   if self.timerPrune then
+      res[#res+1] = {
+         title = "   - next prune: " .. os.date(fmt, math.floor(os.time() + self.timerPrune:nextTrigger())),
+         disabled = true
+      }
+   end
+   if self.lastPrune then
+      res[#res+1] = {
+         title = "   - last prune: " .. os.date(fmt, self.lastPrune),
+         disabled = true
+      }
+   end
+   -- done
+   return res;
 end
 
 function obj:updateStatus(newStatus)
