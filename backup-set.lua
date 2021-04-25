@@ -27,48 +27,63 @@ function obj:start()
 end
 
 function obj:startBackup()
+   local nextBackup = self.lastBackup + self.intervals.backup - os.time()
    self.timerBackup = hs.timer.new(
-      self.intervals.backup,
+      0,
       function()
          self:goBackup()
       end,
       true -- continueOnError
    )
+   self.timerBackup:setNextTrigger(nextBackup)
    self.startedBackup = os.time()
    self.status = nil
    self.timerBackup:start()
 end
 
 function obj:startPrune()
+   local nextPrune = self.lastPrune + self.intervals.prune - os.time()
    self.timerPrune = hs.timer.new(
-      self.intervals.prune,
+      0,
       function()
          self:goPrune()
       end,
       true -- continueOnError
    )
+   self.timerPrune:setNextTrigger(nextPrune)
    self.startedPrune = os.time()
    self.status = nil
    self.timerPrune:start()
 end
 
 function obj:pause()
+   -- FIXME
 end
 
 function obj:unpause()
+   -- FIXME
 end
 
 function obj:stop()
+   -- FIXME
 end
 
 function obj:goBackup()
    if self.app.conf.debug then print("BackupSpoon:", "backup trigger for set '" .. self.id .. "'") end
-   
+   -- TODO: Avoid backup up while prune runs!
+
+   self.lastBackup = os.time()
+   self.timerBackup:setNextTrigger(self.intervals.backup)
+   self.app:stateFileWrite()
 end
 
 function obj:goPrune()
    if self.app.conf.debug then print("BackupSpoon:", "prune trigger for set '" .. self.id .. "'") end
+   -- TODO: Avoid prune while backup runs!
 
+   self.lastPrune = os.time()
+   self.timerPrune:setNextTrigger(self.intervals.prune)
+   self.app:stateFileWrite()
 end
 
 function obj:display()
@@ -104,21 +119,9 @@ function obj:display()
       end
    }
    -- additional information
-   if self.timerBackup then
-      res[#res+1] = {
-         title = "   - next backup: " .. os.date(fmt, math.floor(os.time() + self.timerBackup:nextTrigger())),
-         disabled = true
-      }
-   end
    if self.lastBackup then
       res[#res+1] = {
          title = "   - last backup: " .. os.date(fmt, self.lastBackup),
-         disabled = true
-      }
-   end
-   if self.timerPrune then
-      res[#res+1] = {
-         title = "   - next prune: " .. os.date(fmt, math.floor(os.time() + self.timerPrune:nextTrigger())),
          disabled = true
       }
    end
@@ -128,11 +131,25 @@ function obj:display()
          disabled = true
       }
    end
+   if self.timerBackup then
+      res[#res+1] = {
+         title = "   - next backup: " .. os.date(fmt, math.floor(os.time() + self.timerBackup:nextTrigger())),
+         disabled = true
+      }
+   end
+   if self.timerPrune then
+      res[#res+1] = {
+         title = "   - next prune: " .. os.date(fmt, math.floor(os.time() + self.timerPrune:nextTrigger())),
+         disabled = true
+      }
+   end
    -- done
    return res;
 end
 
 function obj:updateStatus(newStatus)
+   self.status = newStatus
+   self.app:updateMenuIcon()
 end
 
 return obj

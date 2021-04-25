@@ -40,6 +40,7 @@ end
 
 function obj.readEnvs(desc)
    local envs = {}
+   if not desc then return envs end
    for idx, env in ipairs(desc) do
       if env.value then
          envs[env.var] = env.value

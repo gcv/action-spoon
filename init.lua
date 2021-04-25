@@ -119,13 +119,13 @@ function obj:init()
    self.menu = hs.menubar.new()
    self:updateMenuIcon()
    self.menu:setMenu(self.makeMenuTable)
-   -- -- activate system watcher
+   -- activate system watcher
    -- self.watcher = hs.caffeinate.watcher.new(
    --    function(evt)
    --       self:systemWatchFn(evt)
    --    end
    -- )
-   -- -- go
+   -- go
    self:start()
    return self
 end
@@ -244,8 +244,8 @@ function obj:stateFileRead()
    -- reconcile the state file with the configuration
    for idxSet, set in ipairs(obj.sets) do
       if obj.state[set.id] then
-         if obj.state[set.id].lastRun then
-            set.lastRun = obj.state[set.id].lastRun
+         if obj.state[set.id].lastBackup then
+            set.lastBackup = obj.state[set.id].lastBackup
          end
          if obj.state[set.id].lastPrune then
             set.lastPrune = obj.state[set.id].lastPrune
@@ -255,7 +255,20 @@ function obj:stateFileRead()
 end
 
 function obj:stateFileWrite()
-   -- FIXME
+   local outStr = ""
+   local fmt = "%Y-%m-%d (%a) %X" -- equivalent to "%H:%M:%S"
+   for idxSet, set in ipairs(obj.sets) do
+      -- if last* is missing, set it to now to get the ball rolling
+      local lastBackup = set.lastBackup or os.time()
+      local lastPrune = set.lastPrune or os.time()
+      outStr = outStr .. set.id .. " = {\n"
+      outStr = outStr .. "   lastBackup = " .. lastBackup .. ", -- " .. os.date(fmt, lastBackup) .. "\n"
+      outStr = outStr .. "   lastPrune  = " .. lastPrune  .. "  -- " .. os.date(fmt, lastPrune) .. "\n"
+      outStr = outStr .. "}\n"
+   end
+   local fh = io.open(obj.conf.state_file, "w")
+   fh:write(outStr)
+   fh:close()
 end
 
 return obj
