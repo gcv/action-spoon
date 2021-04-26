@@ -28,14 +28,17 @@ end
 
 function obj:startBackup()
    local nextBackup = self.lastBackup + self.intervals.backup - os.time()
+   -- if nextBackup is in the past (i.e., < 0), then set it to run a minute from now
+   if nextBackup <= 0 then
+      nextBackup = 60
+   end
    self.timerBackup = hs.timer.new(
-      0,
+      nextBackup,
       function()
          self:goBackup()
       end,
       true -- continueOnError
    )
-   self.timerBackup:setNextTrigger(nextBackup)
    self.startedBackup = os.time()
    self.status = nil
    self.timerBackup:start()
@@ -43,14 +46,18 @@ end
 
 function obj:startPrune()
    local nextPrune = self.lastPrune + self.intervals.prune - os.time()
+   -- if nextPrune is in the past (i.e., < 0), then set it to run a minute from now
+   if nextPrune <= 0 then
+      nextPrune = 60
+   end
+   -- FIXME: If there is no prune command, DO NOT SET THE TIMER.
    self.timerPrune = hs.timer.new(
-      0,
+      nextPrune,
       function()
          self:goPrune()
       end,
       true -- continueOnError
    )
-   self.timerPrune:setNextTrigger(nextPrune)
    self.startedPrune = os.time()
    self.status = nil
    self.timerPrune:start()
