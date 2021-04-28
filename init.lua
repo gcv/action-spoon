@@ -73,7 +73,7 @@ function obj:init()
    BackupSet.app = self
    -- process conf file: sensible defaults
    if not self.conf.state_file then
-      self.conf.state_file = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/BackupSpoon-state.lua"
+      self.conf.state_file = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/BackupSpoon-state.json"
    else
       -- FIXME: Resolve ~ in whatever is given here.
    end
@@ -235,12 +235,7 @@ function obj:notify(kind, text)
 end
 
 function obj:stateFileRead()
-   local stateFileFn, err = loadfile(obj.conf.state_file, "t", obj.state)
-   if stateFileFn then
-      stateFileFn()
-   else
-      -- state file missing, this is fine
-   end
+   obj.state = hs.json.read(obj.conf.state_file)
    -- reconcile the state file with the configuration
    for idxSet, set in ipairs(obj.sets) do
       if obj.state[set.id] then
@@ -255,20 +250,22 @@ function obj:stateFileRead()
 end
 
 function obj:stateFileWrite()
-   local outStr = ""
    local fmt = "%Y-%m-%d (%a) %X" -- equivalent to "%H:%M:%S"
+   local state = {}
    for idxSet, set in ipairs(obj.sets) do
-      -- if last* is missing, set it to now to get the ball rolling
-      local lastBackup = set.lastBackup or os.time()
-      local lastPrune = set.lastPrune or os.time()
-      outStr = outStr .. set.id .. " = {\n"
-      outStr = outStr .. "   lastBackup = " .. lastBackup .. ", -- " .. os.date(fmt, lastBackup) .. "\n"
-      outStr = outStr .. "   lastPrune  = " .. lastPrune  .. "  -- " .. os.date(fmt, lastPrune) .. "\n"
-      outStr = outStr .. "}\n"
+      local lb = set.lastBackup or os.time()
+      local lp = set.lastPrune or os.time()
+      state[set.id] = {
+         lastBackup = lb,
+         lastBackupStr = os.date(fmt, lb),
+         lastPrune = lp,
+         lastPruneStr = os.date(fmt, lp)
+      }
    end
-   local fh = io.open(obj.conf.state_file, "w")
-   fh:write(outStr)
-   fh:close()
+   local res = hs.json.write(state, obj.conf.state_file, true, true)
+   if not res then
+      obj:notify("error", "Failed to write state file")
+   end
 end
 
 return obj
