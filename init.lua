@@ -255,12 +255,15 @@ function obj:stateFileWrite()
    for idxSet, set in ipairs(obj.sets) do
       local lb = set.lastBackup or os.time()
       local lp = set.lastPrune or os.time()
-      state[set.id] = {
-         lastBackup = lb,
-         lastBackupStr = os.date(fmt, lb),
-         lastPrune = lp,
-         lastPruneStr = os.date(fmt, lp)
-      }
+      state[set.id] = {}
+      if "disabled" ~= set.intervals.backup then
+         state[set.id].lastBackup = lb
+         state[set.id].lastBackupStr = os.date(fmt, lb)
+      end
+      if "disabled" ~= set.intervals.prune then
+         state[set.id].lastPrune = lp
+         state[set.id].lastPruneStr = os.date(fmt, lp)
+      end
    end
    local res = hs.json.write(state, obj.conf.state_file, true, true)
    if not res then

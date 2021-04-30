@@ -10,11 +10,10 @@ function obj.new(id, intervals, env, backups)
       lastBackup = nil,
       lastPrune = nil,
       status = nil,
-      startedBackup = nil,
-      startedPrune = nil,
       timerBackup = nil,
       timerPrune = nil,
-      task = nil
+      taskBackup = nil,
+      taskPrune = nil
    }
    setmetatable(self, obj)
    return self
@@ -27,7 +26,10 @@ function obj:start()
 end
 
 function obj:startBackup()
-   local nextBackup = self.lastBackup + self.intervals.backup - os.time()
+   if "disabled" == self.intervals.backup then
+      return
+   end
+   local nextBackup = (self.lastBackup or os.time()) + self.intervals.backup - os.time()
    -- if nextBackup is in the past (i.e., < 0), then set it to run a minute from now
    if nextBackup <= 0 then
       nextBackup = 60
@@ -39,18 +41,19 @@ function obj:startBackup()
       end,
       true -- continueOnError
    )
-   self.startedBackup = os.time()
    self.status = nil
    self.timerBackup:start()
 end
 
 function obj:startPrune()
-   local nextPrune = self.lastPrune + self.intervals.prune - os.time()
+   if "disabled" == self.intervals.prune then
+      return
+   end
+   local nextPrune = (self.lastPrune or os.time()) + self.intervals.prune - os.time()
    -- if nextPrune is in the past (i.e., < 0), then set it to run a minute from now
    if nextPrune <= 0 then
       nextPrune = 60
    end
-   -- FIXME: If there is no prune command, DO NOT SET THE TIMER.
    self.timerPrune = hs.timer.new(
       nextPrune,
       function()
@@ -58,7 +61,6 @@ function obj:startPrune()
       end,
       true -- continueOnError
    )
-   self.startedPrune = os.time()
    self.status = nil
    self.timerPrune:start()
 end
@@ -69,6 +71,7 @@ end
 
 function obj:unpause()
    -- FIXME
+   -- force timer reset?
 end
 
 function obj:stop()
@@ -76,8 +79,19 @@ function obj:stop()
 end
 
 function obj:goBackup()
+   if "disabled" == self.intervals.backup then
+      self.app:stateFileWrite()
+      return
+   end
+
    if self.app.conf.debug then print("BackupSpoon:", "backup trigger for set '" .. self.id .. "'") end
-   -- TODO: Avoid backup up while prune runs!
+
+   -- avoid backup up while prune runs! try again in 5min
+   if "running" == self.status then
+      if self.app.conf.debug then print("BackupSpoon:", "backup delayed while prune running for set '" .. self.id .. "'") end
+      self.timerBackup:setNextTrigger(300)
+      return
+   end
 
    self.lastBackup = os.time()
    self.timerBackup:setNextTrigger(self.intervals.backup)
@@ -85,9 +99,24 @@ function obj:goBackup()
 end
 
 function obj:goPrune()
-   if self.app.conf.debug then print("BackupSpoon:", "prune trigger for set '" .. self.id .. "'") end
-   -- TODO: Avoid prune while backup runs!
+   if "disabled" == self.intervals.prune then
+      self.app:stateFileWrite()
+      return
+   end
 
+   if self.app.conf.debug then print("BackupSpoon:", "prune trigger for set '" .. self.id .. "'") end
+
+   -- avoid pruning up while backup runs! try again in 5min
+   if "running" == self.status then
+      if self.app.conf.debug then print("BackupSpoon:", "prune delayed while backup running for set '" .. self.id .. "'") end
+      self.timerPrune:setNextTrigger(300)
+      return
+   end
+
+   -- do actual work
+   -- FIXME
+   --self:updateStatus("running")
+   --self.taskPrune = hs.task.new(
    self.lastPrune = os.time()
    self.timerPrune:setNextTrigger(self.intervals.prune)
    self.app:stateFileWrite()
