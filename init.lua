@@ -28,7 +28,7 @@ local BackupSet = dofile(obj.spoonPath .. "/backup-set.lua")
 
 --- Internal state:
 obj.confFile = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/BackupSpoon.lua"
-obj.conf = {}
+obj.conf = setmetatable({}, {__index=_G}) -- XXX: Allow function calls in conf file! @@
 obj.state = {}
 obj.sets = {}
 obj.active = false

@@ -12,8 +12,7 @@ function obj.new(id, intervals, env, backups)
       status = nil,
       timerBackup = nil,
       timerPrune = nil,
-      taskBackup = nil,
-      taskPrune = nil
+      currentTask = nil,
    }
    setmetatable(self, obj)
    return self
@@ -93,9 +92,7 @@ function obj:goBackup()
       return
    end
 
-   self.lastBackup = os.time()
-   self.timerBackup:setNextTrigger(self.intervals.backup)
-   self.app:stateFileWrite()
+   self:helper(1, "backup")
 end
 
 function obj:goPrune()
@@ -106,20 +103,59 @@ function obj:goPrune()
 
    if self.app.conf.debug then print("BackupSpoon:", "prune trigger for set '" .. self.id .. "'") end
 
-   -- avoid pruning up while backup runs! try again in 5min
+   -- avoid pruning while backup runs! try again in 5min
    if "running" == self.status then
       if self.app.conf.debug then print("BackupSpoon:", "prune delayed while backup running for set '" .. self.id .. "'") end
       self.timerPrune:setNextTrigger(300)
       return
    end
 
-   -- do actual work
-   -- FIXME
-   --self:updateStatus("running")
-   --self.taskPrune = hs.task.new(
-   self.lastPrune = os.time()
-   self.timerPrune:setNextTrigger(self.intervals.prune)
-   self.app:stateFileWrite()
+   self:helper(1, "prune")
+end
+
+function obj:helper(backupIdx, runType)
+   local entry = self.backups[backupIdx]
+   if not entry then
+      -- base case: after last run, so finished successfully
+      if "prune" == runType then
+         self.lastPrune = os.time()
+         self.timerPrune:setNextTrigger(self.intervals.prune)
+      else
+         self.lastBackup = os.time()
+         self.timerBackup:setNextTrigger(self.intervals.backup)
+      end
+      if "stopped" == savedStatus then
+         self:updateStatus("stopped")
+      else
+         self:updateStatus("ok")
+      end
+      self.app:stateFileWrite()
+   elseif "function" == type(entry.command) then
+      -- simple: call the command, recurse
+      entry.command()
+      self:helper(backupIdx + 1, runType)
+   elseif "table" == type(entry.command) then
+      self.currentTask = hs.task.new(
+         entry.command, -- FIXME: Does this need path resolution?
+         function(code, stdout, stderr)
+            if 0 == code then
+               if self.app.conf.debug then print("BackupSpoon:", "task successful: " .. self.id .. ", " .. entry.id) end
+               -- recurse to the next entry
+               self:helper(backupIdx + 1, runType)
+            else
+               -- task failed or interrupted; its status needs to be updated
+               -- externally
+               if self.app.conf.debug then print("BackupSpoon:", "task did not succeed, status: " .. status) end
+               -- do not recurse to the next entry, retry the whole run later
+               if "prune" == runType then
+                  self.timerPrune:setNextTrigger(300)
+               else
+                  self.timerBackup:setNextTrigger(300)
+               end
+            end
+         end
+      )
+   end
 end
 
 function obj:display()
