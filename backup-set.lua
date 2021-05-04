@@ -135,17 +135,26 @@ function obj:helper(backupIdx, runType)
       entry.command()
       self:helper(backupIdx + 1, runType)
    elseif "table" == type(entry.command) then
+      local splits = hs.fnutils.copy(entry.command)
+      local cmd = self.app.Utils.findExecutable(table.remove(splits, 1))
       self.currentTask = hs.task.new(
-         entry.command, -- FIXME: Does this need path resolution?
+         cmd,
          function(code, stdout, stderr)
             if 0 == code then
                if self.app.conf.debug then print("BackupSpoon:", "task successful: " .. self.id .. ", " .. entry.id) end
                -- recurse to the next entry
                self:helper(backupIdx + 1, runType)
             else
-               -- task failed or interrupted; its status needs to be updated
-               -- externally
-               if self.app.conf.debug then print("BackupSpoon:", "task did not succeed, status: " .. status) end
+               -- task failed or interrupted
+               if "interrupt" == self.currentTask:terminationReason() then
+                  if self.app.conf.debug then print("BackupSpoon:", "task interrupted, code: " .. code .. ", stderr:" .. stderr) end
+                  -- FIXME: Fully support interrupted (orange icon, dedicated Unicode)
+                  self:updateStatus("error")
+               else
+                  if self.app.conf.debug then print("BackupSpoon:", "task failed, code: " .. code .. ", stderr:" .. stderr) end
+                  self.app:notify("error", "Task failed: " .. self.id .. ", " .. entry.id)
+                  self:updateStatus("error")
+               end
                -- do not recurse to the next entry, retry the whole run later
                if "prune" == runType then
                   self.timerPrune:setNextTrigger(300)
@@ -153,8 +162,11 @@ function obj:helper(backupIdx, runType)
                   self.timerBackup:setNextTrigger(300)
                end
             end
-         end
+         end,
+         splits -- rest of the args
       )
+      local taskEnv = self.app.Utils.merge(self.currentTask:environment(), self.env)
+      self.currentTask:start()
    end
 end
 
