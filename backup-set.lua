@@ -133,6 +133,7 @@ function obj:helper(backupIdx, runType)
    elseif "function" == type(entry.command) then
       -- simple: call the command, recurse
       entry.command()
+      self:updateStatus("running")
       self:helper(backupIdx + 1, runType)
    elseif "table" == type(entry.command) then
       local splits = hs.fnutils.copy(entry.command)
@@ -148,8 +149,7 @@ function obj:helper(backupIdx, runType)
                -- task failed or interrupted
                if "interrupt" == self.currentTask:terminationReason() then
                   if self.app.conf.debug then print("BackupSpoon:", "task interrupted, code: " .. code .. ", stderr:" .. stderr) end
-                  -- FIXME: Fully support interrupted (orange icon, dedicated Unicode)
-                  self:updateStatus("error")
+                  self:updateStatus("interrupted")
                else
                   if self.app.conf.debug then print("BackupSpoon:", "task failed, code: " .. code .. ", stderr:" .. stderr) end
                   self.app:notify("error", "Task failed: " .. self.id .. ", " .. entry.id)
@@ -166,6 +166,7 @@ function obj:helper(backupIdx, runType)
          splits -- rest of the args
       )
       local taskEnv = self.app.Utils.merge(self.currentTask:environment(), self.env)
+      self:updateStatus("running")
       self.currentTask:start()
    end
 end

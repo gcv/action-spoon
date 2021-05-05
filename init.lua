@@ -38,6 +38,8 @@ obj.watcher = nil
 obj.menuIconNormal = hs.image.imageFromPath(obj.spoonPath .. "/resources/menu-icon-normal.png")
 obj.menuIconError = hs.image.imageFromPath(obj.spoonPath .. "/resources/menu-icon-error.png")
 obj.menuIconInactive = hs.image.imageFromPath(obj.spoonPath .. "/resources/menu-icon-inactive.png")
+obj.menuIconRunning = hs.image.imageFromPath(obj.spoonPath .. "/resources/menu-icon-running.png")
+obj.menuIconInterrupted = hs.image.imageFromPath(obj.spoonPath .. "/resources/menu-icon-interrupted.png")
 obj.notifyIconNormal = hs.image.imageFromPath(obj.spoonPath .. "/resources/notify-icon-normal.png")
 obj.notifyIconError = hs.image.imageFromPath(obj.spoonPath .. "/resources/notify-icon-error.png")
 
@@ -208,15 +210,25 @@ function obj:updateMenuIcon()
       end
       return
    end
+   local anyErrors = false
+   local anyInterrupted = false
+   local anyRunning = false
    for idx, set in ipairs(obj.sets) do
       if "error" == set.status then
-         if obj.menu:icon() ~= obj.menuIconError then
-            obj.menu:setIcon(obj.menuIconError, false)
-         end
-         return
+         anyErrors = true
+      elseif "interrupted" == set.status then
+         anyInterrupted = true
+      elseif "running" == set.status then
+         anyRunning = true
       end
    end
-   if obj.menu:icon() ~= obj.menuIconNormal then
+   if anyErrors and obj.menu:icon() ~= obj.menuIconError then
+      obj.menu:setIcon(obj.menuIconError, true)
+   elseif anyInterrupted and obj.menu:icon() ~= obj.menuIconInterrupted then
+      obj.menu:setIcon(obj.menuIconInterrupted, false)
+   elseif anyRunning and obj.menu:icon() ~= obj.menuIconRunning then
+      obj.menu:setIcon(obj.menuIconRunning, true)
+   elseif obj.menu:icon() ~= obj.menuIconNormal then
       obj.menu:setIcon(obj.menuIconNormal, true)
    end
 end
