@@ -75,7 +75,7 @@ function obj:init()
    if not self.conf.state_file then
       self.conf.state_file = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/BackupSpoon-state.json"
    else
-      -- FIXME: Resolve ~ in whatever is given here.
+      self.conf.state_file = hs.fs.pathToAbsolute(self.conf.state_file)
    end
    if not self.conf.path then
       self.conf.path = { "/bin", "/usr/bin", "/usr/local/bin" }
