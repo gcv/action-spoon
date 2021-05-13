@@ -74,16 +74,16 @@ function obj:init()
    self.Utils = Utils
    Set.app = self
    -- process conf file: sensible defaults
-   if not self.conf.state_file then
-      self.conf.state_file = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/ActionSpoon-state.json"
+   if not self.conf.stateFile then
+      self.conf.stateFile = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/ActionSpoon-state.json"
    else
-      self.conf.state_file = hs.fs.pathToAbsolute(self.conf.state_file)
+      self.conf.stateFile = hs.fs.pathToAbsolute(self.conf.stateFile)
    end
    if not self.conf.path then
       self.conf.path = { "/bin", "/usr/bin", "/usr/local/bin" }
    end
-   if not self.conf.exclude_wifi_networks then
-      self.conf.exclude_wifi_networks = {}
+   if not self.conf.excludedSSIDs then
+      self.conf.excludedSSIDs = {}
    end
    if not self.conf.intervals then
       self.conf.intervals = {
@@ -105,9 +105,10 @@ function obj:init()
       local intervals = set.intervals or self.conf.intervals
       intervals.poll = intervals.poll or self.conf.intervals.poll
       intervals.commands = intervals.commands or self.conf.intervals.commands
+      local excludedSSIDs = set.excludedSSIDs or self.conf.excludedSSIDs
       local env = Utils.merge(self.conf.env, Utils.readEnvs(set.environment))
       local actions = set.actions
-      self.sets[#self.sets+1] = Set.new(id, intervals, env, actions)
+      self.sets[#self.sets+1] = Set.new(id, intervals, env, excludedSSIDs, actions)
    end
    if 0 == #self.sets then
       self:notify("error", "No action sets defined. Check configuration.")
@@ -259,7 +260,7 @@ function obj:notify(kind, text)
 end
 
 function obj:stateFileRead()
-   obj.state = hs.json.read(obj.conf.state_file)
+   obj.state = hs.json.read(obj.conf.stateFile)
    -- reconcile the state file with the configuration
    for idxSet, set in ipairs(obj.sets) do
       if obj.state and obj.state[set.id] then
@@ -281,7 +282,7 @@ function obj:stateFileWrite()
          set.lastActions
       )
    end
-   local res = hs.json.write(state, obj.conf.state_file, true, true)
+   local res = hs.json.write(state, obj.conf.stateFile, true, true)
    if not res then
       obj:notify("error", "Failed to write state file")
    end

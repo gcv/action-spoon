@@ -1,11 +1,12 @@
 local obj = { name = "Set" }
 obj.__index = obj
 
-function obj.new(id, intervals, env, actions)
+function obj.new(id, intervals, env, excludedSSIDs, actions)
    local self = {
       id = id,
       intervals = intervals,
       env = env,
+      excludedSSIDs = excludedSSIDs,
       actions = actions,
       lastActions = {},
       status = nil,
@@ -60,8 +61,18 @@ end
 function obj:goCommand(idxCmd)
    if self.app.conf.debug then print("ActionSpoon:", "command[" .. idxCmd .. "] trigger for set '" .. self.id .. "'") end
    -- avoid simultaneous runs! try again in <poll> min
-   if "running" == self.status then
-      if self.app.conf.debug then print("ActionSpoon:", "command[" .. idxCmd .. "] delayed while another task is (still?) running for set '" .. self.id .. "'") end
+   local isRunning = "running" == self.status
+   local currentSSID = hs.wifi.currentNetwork()
+   local isExcludedSSID = false
+   for idxSSID, rxSSID in ipairs(self.excludedSSIDs) do
+      if string.find(currentSSID, rxSSID) then
+         isExcludedSSID = true
+         break
+      end
+   end
+   if isRunning or isExcludedSSID then
+      if self.app.conf.debug and isRunning then print("ActionSpoon:", "command[" .. idxCmd .. "] delayed while another task is (still?) running for set '" .. self.id .. "'") end
+      if self.app.conf.debug and isExcludedSSID then print("ActionSpoon:", "command[" .. idxCmd .. "] delayed while on excluded SSID '" .. self.id .. "', " .. currentSSID) end
       self.timers[idxCmd]:setNextTrigger(self.intervals.poll)
       return
    end
