@@ -87,9 +87,13 @@ function obj:init()
    end
    if not self.conf.intervals then
       self.conf.intervals = {
+         poll = 5 * 60,             -- 5 minutes
          backup = 60 * 60,          -- 1 hour
          prune = 60 * 60 * 24 * 30, -- 30 days
       }
+   end
+   if not self.conf.intervals.poll then
+      self.conf.intervals.poll = 5 * 60              -- 5 minutes
    end
    if not self.conf.intervals.backup then
       self.conf.intervals.backup = 60 * 60           -- 1 hour
@@ -122,11 +126,11 @@ function obj:init()
    self:updateMenuIcon()
    self.menu:setMenu(self.makeMenuTable)
    -- activate system watcher
-   -- self.watcher = hs.caffeinate.watcher.new(
-   --    function(evt)
-   --       self:systemWatchFn(evt)
-   --    end
-   -- )
+   self.watcher = hs.caffeinate.watcher.new(
+      function(evt)
+         self:systemWatchFn(evt)
+      end
+   )
    -- go
    self:start()
    return self
@@ -146,7 +150,7 @@ function obj:start()
    for idx, set in ipairs(obj.sets) do
       set:start()
    end
-   -- obj.watcher:start()
+   obj.watcher:start()
    obj:updateMenuIcon()
 end
 
@@ -160,7 +164,7 @@ end
 --- Returns:
 ---  * None
 function obj:stop()
-   -- obj.watcher:stop()
+   obj.watcher:stop()
    for idx, set in ipairs(obj.sets) do
       set:stop()
    end
@@ -201,6 +205,21 @@ function obj:makeMenuTable()
       }
    end
    return res
+end
+
+function obj:systemWatchFn(event)
+   if not obj.active then
+      return
+   end
+   if hs.caffeinate.watcher.systemWillSleep == event then
+      for idx, set in ipairs(obj.sets) do
+         set:stop()
+      end
+   elseif hs.caffeinate.watcher.systemDidWake == event then
+      for idx, set in ipairs(obj.sets) do
+         set:start()
+      end
+   end
 end
 
 function obj:updateMenuIcon()
@@ -250,7 +269,7 @@ function obj:stateFileRead()
    obj.state = hs.json.read(obj.conf.state_file)
    -- reconcile the state file with the configuration
    for idxSet, set in ipairs(obj.sets) do
-      if obj.state[set.id] then
+      if obj.state and obj.state[set.id] then
          if obj.state[set.id].lastBackup then
             set.lastBackup = obj.state[set.id].lastBackup
          end

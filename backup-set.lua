@@ -12,7 +12,7 @@ function obj.new(id, intervals, env, backups)
       status = nil,
       timerBackup = nil,
       timerPrune = nil,
-      currentTask = nil,
+      task = nil,
    }
    setmetatable(self, obj)
    return self
@@ -24,8 +24,30 @@ function obj:start()
    self:startPrune()
 end
 
+function obj:stop()
+   if "stopped" == self.status then
+      -- do nothing
+      return
+   end
+   -- if a task is running, we must interrupt it
+   if "running" == self.status and self.task and self.task:isRunning() then
+      self.task:interrupt()
+   end
+   -- stop the timers
+   if self.timerBackup then
+      if self.app.conf.debug then print("BackupSpoon:", "stopping backup timer for set '" .. self.id .. "'") end
+      self.timerBackup:stop()
+   end
+   if self.timerPrune then
+      if self.app.conf.debug then print("BackupSpoon:", "stopping prune timer for set '" .. self.id .. "'") end
+      self.timerPrune:stop()
+   end
+   self:updateStatus("stopped")
+end
+
 function obj:startBackup()
    if "disabled" == self.intervals.backup then
+      if self.app.conf.debug then print("BackupSpoon:", "backup for set id '" .. self.id .. "' disabled in configuration") end
       return
    end
    local nextBackup = (self.lastBackup or os.time()) + self.intervals.backup - os.time()
@@ -46,6 +68,7 @@ end
 
 function obj:startPrune()
    if "disabled" == self.intervals.prune then
+      if self.app.conf.debug then print("BackupSpoon:", "prune for set id '" .. self.id .. "' disabled in configuration") end
       return
    end
    local nextPrune = (self.lastPrune or os.time()) + self.intervals.prune - os.time()
@@ -64,19 +87,6 @@ function obj:startPrune()
    self.timerPrune:start()
 end
 
-function obj:pause()
-   -- FIXME
-end
-
-function obj:unpause()
-   -- FIXME
-   -- force timer reset?
-end
-
-function obj:stop()
-   -- FIXME
-end
-
 function obj:goBackup()
    if "disabled" == self.intervals.backup then
       self.app:stateFileWrite()
@@ -87,8 +97,8 @@ function obj:goBackup()
 
    -- avoid backup up while prune runs! try again in 5min
    if "running" == self.status then
-      if self.app.conf.debug then print("BackupSpoon:", "backup delayed while prune running for set '" .. self.id .. "'") end
-      self.timerBackup:setNextTrigger(300)
+      if self.app.conf.debug then print("BackupSpoon:", "backup delayed while another task is (still?) running for set '" .. self.id .. "'") end
+      self.timerBackup:setNextTrigger(self.intervals.poll)
       return
    end
 
@@ -105,8 +115,8 @@ function obj:goPrune()
 
    -- avoid pruning while backup runs! try again in 5min
    if "running" == self.status then
-      if self.app.conf.debug then print("BackupSpoon:", "prune delayed while backup running for set '" .. self.id .. "'") end
-      self.timerPrune:setNextTrigger(300)
+      if self.app.conf.debug then print("BackupSpoon:", "prune delayed while another task is (still?) running for set '" .. self.id .. "'") end
+      self.timerPrune:setNextTrigger(self.intervals.poll)
       return
    end
 
@@ -124,11 +134,8 @@ function obj:helper(backupIdx, runType)
          self.lastBackup = os.time()
          self.timerBackup:setNextTrigger(self.intervals.backup)
       end
-      if "stopped" == savedStatus then
-         self:updateStatus("stopped")
-      else
-         self:updateStatus("ok")
-      end
+      self:updateStatus("ok")
+      self.task = nil
       self.app:stateFileWrite()
    elseif "function" == type(entry.command) then
       -- simple: call the command, recurse
@@ -136,38 +143,48 @@ function obj:helper(backupIdx, runType)
       self:updateStatus("running")
       self:helper(backupIdx + 1, runType)
    elseif "table" == type(entry.command) then
-      local splits = hs.fnutils.copy(entry.command)
+      local splits
+      if "prune" == runType then
+         splits = hs.fnutils.copy(entry.prune)
+      else
+         splits = hs.fnutils.copy(entry.command)
+      end
       local cmd = self.app.Utils.findExecutable(table.remove(splits, 1))
-      self.currentTask = hs.task.new(
+      self.task = hs.task.new(
          cmd,
          function(code, stdout, stderr)
             if 0 == code then
-               if self.app.conf.debug then print("BackupSpoon:", "task successful: " .. self.id .. ", " .. entry.id) end
+               if self.app.conf.debug then print("BackupSpoon:", "task successful: " .. self.id .. ", " .. entry.id .. ", " .. runType) end
                -- recurse to the next entry
                self:helper(backupIdx + 1, runType)
             else
                -- task failed or interrupted
-               if "interrupt" == self.currentTask:terminationReason() then
+               if "interrupt" == self.task:terminationReason() then
                   if self.app.conf.debug then print("BackupSpoon:", "task interrupted, code: " .. code .. ", stderr:" .. stderr) end
-                  self:updateStatus("interrupted")
+                  if self.status ~= "stopped" then
+                     self:updateStatus("interrupted")
+                  end
                else
-                  if self.app.conf.debug then print("BackupSpoon:", "task failed, code: " .. code .. ", stderr:" .. stderr) end
+                  -- always print errors to console, regardless of debug flag
+                  print("BackupSpoon:", "task failed, code: " .. code .. ", stderr:" .. stderr)
                   self.app:notify("error", "Task failed: " .. self.id .. ", " .. entry.id)
                   self:updateStatus("error")
                end
                -- do not recurse to the next entry, retry the whole run later
-               if "prune" == runType then
-                  self.timerPrune:setNextTrigger(300)
-               else
-                  self.timerBackup:setNextTrigger(300)
+               if "stopped" ~= self.status then
+                  if "prune" == runType then
+                     self.timerPrune:setNextTrigger(self.intervals.poll)
+                  else
+                     self.timerBackup:setNextTrigger(self.intervals.poll)
+                  end
                end
             end
          end,
          splits -- rest of the args
       )
-      local taskEnv = self.app.Utils.merge(self.currentTask:environment(), self.env)
+      local taskEnv = self.app.Utils.merge(self.task:environment(), self.env)
       self:updateStatus("running")
-      self.currentTask:start()
+      self.task:start()
    end
 end
 
@@ -185,6 +202,7 @@ function obj:display()
    elseif "stopped" == self.status then
       setTitle = setTitle .. "×"
    else
+      -- nil or "interrupted"
       setTitle = setTitle .. "•"
    end
    -- path
@@ -198,7 +216,7 @@ function obj:display()
                    ", ")
    res[#res+1] = {
       title = setTitle,
-      disabled = ("running" == self.status),
+      disabled = ("running" == self.status or "stopped" == self.status),
       fn = function()
          self:goBackup()
       end
