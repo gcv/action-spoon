@@ -7,11 +7,9 @@ function obj.new(id, intervals, env, actions)
       intervals = intervals,
       env = env,
       actions = actions,
-      lastAction1 = nil,
-      lastAction2 = nil,
+      lastActions = {},
       status = nil,
-      timerAction1 = nil,
-      timerAction2 = nil,
+      timers = {},
       task = nil,
    }
    setmetatable(self, obj)
@@ -20,8 +18,9 @@ end
 
 function obj:start()
    if self.app.conf.debug then print("ActionSpoon:", "starting timers for set '" .. self.id .. "'") end
-   self:startAction1()
-   self:startAction2()
+   for idxCmd, _ in ipairs(self.intervals.commands) do
+      self:startCommand(idxCmd)
+   end
 end
 
 function obj:stop()
@@ -34,124 +33,65 @@ function obj:stop()
       self.task:interrupt()
    end
    -- stop the timers
-   if self.timerAction1 then
-      if self.app.conf.debug then print("ActionSpoon:", "stopping action1 timer for set '" .. self.id .. "'") end
-      self.timerAction1:stop()
-   end
-   if self.timerAction2 then
-      if self.app.conf.debug then print("ActionSpoon:", "stopping action2 timer for set '" .. self.id .. "'") end
-      self.timerAction2:stop()
+   for idxTimer, timer in ipairs(self.timers) do
+      if self.app.conf.debug then print("ActionSpoon:", "stopping command[" .. idxTimer .. "] timer for set '" .. self.id .. "'") end
+      self.timers[idxTimer]:stop()
    end
    self:updateStatus("stopped")
 end
 
-function obj:startAction1()
-   if "disabled" == self.intervals.action1 then
-      if self.app.conf.debug then print("ActionSpoon:", "action1 for set id '" .. self.id .. "' disabled in configuration") end
-      return
+function obj:startCommand(idxCmd)
+   local nextAction = (self.lastActions[idxCmd] or os.time()) + self.intervals.commands[idxCmd] - os.time()
+   -- if nextAction is in the past (i.e., < 0), then set it to run a minute from now
+   if nextAction <= 0 then
+      nextAction = 60
    end
-   local nextAction1 = (self.lastAction1 or os.time()) + self.intervals.action1 - os.time()
-   -- if nextAction1 is in the past (i.e., < 0), then set it to run a minute from now
-   if nextAction1 <= 0 then
-      nextAction1 = 60
-   end
-   self.timerAction1 = hs.timer.new(
-      nextAction1,
+   self.timers[idxCmd] = hs.timer.new(
+      nextAction,
       function()
-         self:goAction1()
+         self:goCommand(idxCmd)
       end,
       true -- continueOnError
    )
    self.status = nil
-   self.timerAction1:start()
+   self.timers[idxCmd]:start()
 end
 
-function obj:startAction2()
-   if "disabled" == self.intervals.action2 then
-      if self.app.conf.debug then print("ActionSpoon:", "action2 for set id '" .. self.id .. "' disabled in configuration") end
-      return
-   end
-   local nextAction2 = (self.lastAction2 or os.time()) + self.intervals.action2 - os.time()
-   -- if nextAction2 is in the past (i.e., < 0), then set it to run a minute from now
-   if nextAction2 <= 0 then
-      nextAction2 = 60
-   end
-   self.timerAction2 = hs.timer.new(
-      nextAction2,
-      function()
-         self:goAction2()
-      end,
-      true -- continueOnError
-   )
-   self.status = nil
-   self.timerAction2:start()
-end
-
-function obj:goAction1()
-   if "disabled" == self.intervals.action1 then
-      self.app:stateFileWrite()
-      return
-   end
-
-   if self.app.conf.debug then print("ActionSpoon:", "action1 trigger for set '" .. self.id .. "'") end
-
+function obj:goCommand(idxCmd)
+   if self.app.conf.debug then print("ActionSpoon:", "command[" .. idxCmd .. "] trigger for set '" .. self.id .. "'") end
    -- avoid simultaneous runs! try again in <poll> min
    if "running" == self.status then
-      if self.app.conf.debug then print("ActionSpoon:", "action1 delayed while another task is (still?) running for set '" .. self.id .. "'") end
-      self.timerAction1:setNextTrigger(self.intervals.poll)
+      if self.app.conf.debug then print("ActionSpoon:", "command[" .. idxCmd .. "] delayed while another task is (still?) running for set '" .. self.id .. "'") end
+      self.timers[idxCmd]:setNextTrigger(self.intervals.poll)
       return
    end
-
-   self:helper(1, "action1")
+   self:helper(1, idxCmd)
 end
 
-function obj:goAction2()
-   if "disabled" == self.intervals.action2 then
-      self.app:stateFileWrite()
-      return
-   end
-
-   if self.app.conf.debug then print("ActionSpoon:", "action2 trigger for set '" .. self.id .. "'") end
-
-   -- avoid simultaneous runs! try again in <poll> min
-   if "running" == self.status then
-      if self.app.conf.debug then print("ActionSpoon:", "action2 delayed while another task is (still?) running for set '" .. self.id .. "'") end
-      self.timerAction2:setNextTrigger(self.intervals.poll)
-      return
-   end
-
-   self:helper(1, "action2")
-end
-
-function obj:helper(actionIdx, runType)
-   local entry = self.actions[actionIdx]
+function obj:helper(idxAction, idxCmd)
+   local entry = self.actions[idxAction]
    if not entry then
       -- base case: after last run, so finished successfully
-      if "action2" == runType then
-         self.lastAction2 = os.time()
-         self.timerAction2:setNextTrigger(self.intervals.action2)
-      else
-         self.lastAction1 = os.time()
-         self.timerAction1:setNextTrigger(self.intervals.action1)
-      end
+      self.lastActions[idxCmd] = os.time()
+      self.timers[idxCmd]:setNextTrigger(self.intervals.commands[idxCmd])
       self:updateStatus("ok")
       self.task = nil
       self.app:stateFileWrite()
-   elseif "function" == type(entry[runType]) then
+   elseif "function" == type(entry.commands[idxCmd]) then
       -- simple: call the command, recurse
-      entry[runType]()
+      entry.commands[idxCmd]()
       self:updateStatus("running")
-      self:helper(actionIdx + 1, runType)
-   elseif "table" == type(entry[runType]) then
-      local splits = hs.fnutils.copy(entry[runType])
+      self:helper(idxAction + 1, idxCmd)
+   elseif "table" == type(entry.commands[idxCmd]) then
+      local splits = hs.fnutils.copy(entry.commands[idxCmd])
       local cmd = self.app.Utils.findExecutable(table.remove(splits, 1))
       self.task = hs.task.new(
          cmd,
          function(code, stdout, stderr)
             if 0 == code then
-               if self.app.conf.debug then print("ActionSpoon:", "task successful: " .. self.id .. ", " .. entry.id .. ", " .. runType) end
+               if self.app.conf.debug then print("ActionSpoon:", "task successful: " .. self.id .. ", " .. entry.id .. ", " .. idxCmd) end
                -- recurse to the next entry
-               self:helper(actionIdx + 1, runType)
+               self:helper(idxAction + 1, idxCmd)
             else
                -- task failed or interrupted
                if "interrupt" == self.task:terminationReason() then
@@ -167,11 +107,7 @@ function obj:helper(actionIdx, runType)
                end
                -- do not recurse to the next entry, retry the whole run later
                if "stopped" ~= self.status then
-                  if "action2" == runType then
-                     self.timerAction2:setNextTrigger(self.intervals.poll)
-                  else
-                     self.timerAction1:setNextTrigger(self.intervals.poll)
-                  end
+                  self.timers[idxCmd]:setNextTrigger(self.intervals.poll)
                end
             end
          end,
@@ -213,31 +149,19 @@ function obj:display()
       title = setTitle,
       disabled = ("running" == self.status or "stopped" == self.status),
       fn = function()
-         self:goAction1()
+         self:goCommand(1)
       end
    }
    -- additional information
-   if self.lastAction1 then
+   for idxLastAction, lastAction in ipairs(self.lastActions) do
       res[#res+1] = {
-         title = "   - last action1: " .. os.date(fmt, self.lastAction1),
+         title = "   - last action[" .. idxLastAction .. "]: " .. os.date(fmt, lastAction),
          disabled = true
       }
    end
-   if self.lastAction2 then
+   for idxTimer, timer in ipairs(self.timers) do
       res[#res+1] = {
-         title = "   - last action2: " .. os.date(fmt, self.lastAction2),
-         disabled = true
-      }
-   end
-   if self.timerAction1 then
-      res[#res+1] = {
-         title = "   - next action1: " .. os.date(fmt, math.floor(os.time() + self.timerAction1:nextTrigger())),
-         disabled = true
-      }
-   end
-   if self.timerAction2 then
-      res[#res+1] = {
-         title = "   - next action2: " .. os.date(fmt, math.floor(os.time() + self.timerAction2:nextTrigger())),
+         title = "   - next action[" .. idxTimer.. "]: " .. os.date(fmt, math.floor(os.time() + timer:nextTrigger())),
          disabled = true
       }
    end

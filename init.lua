@@ -87,19 +87,12 @@ function obj:init()
    end
    if not self.conf.intervals then
       self.conf.intervals = {
-         poll = 5 * 60,               -- 5 minutes
-         action1 = 60 * 60,           -- 1 hour
-         action2 = 60 * 60 * 24 * 30, -- 30 days
+         poll = 5 * 60, -- 5 minutes
+         commands = {}
       }
    end
    if not self.conf.intervals.poll then
-      self.conf.intervals.poll = 5 * 60                -- 5 minutes
-   end
-   if not self.conf.intervals.action1 then
-      self.conf.intervals.action1 = 60 * 60            -- 1 hour
-   end
-   if not self.conf.intervals.action2 then
-      self.conf.intervals.action2 = 60 * 60 * 24 * 30  -- 30 days
+      self.conf.intervals.poll = 5 * 60 -- 5 minutes
    end
    if not self.conf.debug then
       self.conf.debug = false
@@ -110,8 +103,8 @@ function obj:init()
    for idx, set in ipairs(self.conf.sets) do
       local id = set.id
       local intervals = set.intervals or self.conf.intervals
-      intervals.action1 = intervals.action1 or self.conf.intervals.action1
-      intervals.action2 = intervals.action2 or self.conf.intervals.action2
+      intervals.poll = intervals.poll or self.conf.intervals.poll
+      intervals.commands = intervals.commands or self.conf.intervals.commands
       local env = Utils.merge(self.conf.env, Utils.readEnvs(set.environment))
       local actions = set.actions
       self.sets[#self.sets+1] = Set.new(id, intervals, env, actions)
@@ -270,12 +263,7 @@ function obj:stateFileRead()
    -- reconcile the state file with the configuration
    for idxSet, set in ipairs(obj.sets) do
       if obj.state and obj.state[set.id] then
-         if obj.state[set.id].lastAction1 then
-            set.lastAction1 = obj.state[set.id].lastAction1
-         end
-         if obj.state[set.id].lastAction2 then
-            set.lastAction2 = obj.state[set.id].lastAction2
-         end
+         set.lastActions = obj.state[set.id].lastActions
       end
    end
 end
@@ -284,17 +272,14 @@ function obj:stateFileWrite()
    local fmt = "%Y-%m-%d (%a) %X" -- equivalent to "%H:%M:%S"
    local state = {}
    for idxSet, set in ipairs(obj.sets) do
-      local lb = set.lastAction1 or os.time()
-      local lp = set.lastAction2 or os.time()
       state[set.id] = {}
-      if "disabled" ~= set.intervals.action1 then
-         state[set.id].lastAction1 = lb
-         state[set.id].lastAction1Str = os.date(fmt, lb)
-      end
-      if "disabled" ~= set.intervals.action2 then
-         state[set.id].lastAction2 = lp
-         state[set.id].lastAction2Str = os.date(fmt, lp)
-      end
+      state[set.id].lastActions = set.lastActions
+      state[set.id].lastActionsAsStrings = Utils.map(
+         function(la)
+            return os.date(fmt, la)
+         end,
+         set.lastActions
+      )
    end
    local res = hs.json.write(state, obj.conf.state_file, true, true)
    if not res then

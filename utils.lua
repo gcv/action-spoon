@@ -75,11 +75,11 @@ function obj.merge(t1, t2)
 end
 
 function obj.map(func, array)
-   local new_array = {}
+   local newArray = {}
    for i, v in ipairs(array) do
-      new_array[i] = func(v)
+      newArray[i] = func(v)
    end
-   return new_array
+   return newArray
 end
 
 return obj
