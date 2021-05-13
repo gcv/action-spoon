@@ -1,18 +1,18 @@
---- === Backup Spoon ===
+--- === Action Spoon ===
 ---
---- Orchestrates automatic backup of local data using command-line utilities
---- such as Restic, Kopia, and Borg.
+--- Orchestrates running scheduled tasks. Useful for automatic backup of local
+--- data using command-line utilities such as Restic, Kopia, and Borg.
 ---
---- Download: https://github.com/gcv/backup-spoon/releases/download/0.0.0/Backup.spoon.zip
+--- Download: https://github.com/gcv/action-spoon/releases/download/0.0.0/Action.spoon.zip
 
 local obj = {}
 obj.__index = obj
 
 --- Metadata
-obj.name = "Backup"
+obj.name = "Action"
 obj.version = "0.0.0"
 obj.author = "gcv"
-obj.homepage = "https://github.com/gcv/backup.spoon"
+obj.homepage = "https://github.com/gcv/action.spoon"
 obj.license = "CC0"
 
 --- Internal function used to find code location.
@@ -24,10 +24,10 @@ obj.spoonPath = scriptPath()
 
 --- Objects:
 local Utils = dofile(obj.spoonPath .. "/utils.lua")
-local BackupSet = dofile(obj.spoonPath .. "/backup-set.lua")
+local Set = dofile(obj.spoonPath .. "/set.lua")
 
 --- Internal state:
-obj.confFile = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/BackupSpoon.lua"
+obj.confFile = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/ActionSpoon.lua"
 obj.conf = setmetatable({}, {__index=_G}) -- XXX: Allow function calls in conf file! @@
 obj.state = {}
 obj.sets = {}
@@ -43,9 +43,9 @@ obj.menuIconInterrupted = hs.image.imageFromPath(obj.spoonPath .. "/resources/me
 obj.notifyIconNormal = hs.image.imageFromPath(obj.spoonPath .. "/resources/notify-icon-normal.png")
 obj.notifyIconError = hs.image.imageFromPath(obj.spoonPath .. "/resources/notify-icon-error.png")
 
---- Backup:init()
+--- Action:init()
 --- Method
---- Initialize Backup.
+--- Initialize Action.
 ---
 --- Parameters:
 ---  * None
@@ -58,7 +58,7 @@ function obj:init()
    if confFn then
       confFn()
    else
-      print("BackupSpoon:", err)
+      print("ActionSpoon:", err)
       obj:notify("error", "Failed to load. Missing configuration file?")
       return
    end
@@ -72,10 +72,10 @@ function obj:init()
    -- configure helper object prototypes
    Utils.app = self
    self.Utils = Utils
-   BackupSet.app = self
+   Set.app = self
    -- process conf file: sensible defaults
    if not self.conf.state_file then
-      self.conf.state_file = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/BackupSpoon-state.json"
+      self.conf.state_file = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/ActionSpoon-state.json"
    else
       self.conf.state_file = hs.fs.pathToAbsolute(self.conf.state_file)
    end
@@ -87,37 +87,37 @@ function obj:init()
    end
    if not self.conf.intervals then
       self.conf.intervals = {
-         poll = 5 * 60,             -- 5 minutes
-         backup = 60 * 60,          -- 1 hour
-         prune = 60 * 60 * 24 * 30, -- 30 days
+         poll = 5 * 60,               -- 5 minutes
+         action1 = 60 * 60,           -- 1 hour
+         action2 = 60 * 60 * 24 * 30, -- 30 days
       }
    end
    if not self.conf.intervals.poll then
-      self.conf.intervals.poll = 5 * 60              -- 5 minutes
+      self.conf.intervals.poll = 5 * 60                -- 5 minutes
    end
-   if not self.conf.intervals.backup then
-      self.conf.intervals.backup = 60 * 60           -- 1 hour
+   if not self.conf.intervals.action1 then
+      self.conf.intervals.action1 = 60 * 60            -- 1 hour
    end
-   if not self.conf.intervals.prune then
-      self.conf.intervals.prune = 60 * 60 * 24 * 30  -- 30 days
+   if not self.conf.intervals.action2 then
+      self.conf.intervals.action2 = 60 * 60 * 24 * 30  -- 30 days
    end
    if not self.conf.debug then
       self.conf.debug = false
    end
    -- process root environment variables
    self.conf.env = Utils.readEnvs(self.conf.environment)
-   -- process conf file: for each backup set, create a new BackupSet object
+   -- process conf file: for each set, create a new Set object
    for idx, set in ipairs(self.conf.sets) do
       local id = set.id
       local intervals = set.intervals or self.conf.intervals
-      intervals.backup = intervals.backup or self.conf.intervals.backup
-      intervals.prune = intervals.prune or self.conf.intervals.prune
+      intervals.action1 = intervals.action1 or self.conf.intervals.action1
+      intervals.action2 = intervals.action2 or self.conf.intervals.action2
       local env = Utils.merge(self.conf.env, Utils.readEnvs(set.environment))
-      local backups = set.backups
-      self.sets[#self.sets+1] = BackupSet.new(id, intervals, env, backups)
+      local actions = set.actions
+      self.sets[#self.sets+1] = Set.new(id, intervals, env, actions)
    end
    if 0 == #self.sets then
-      self:notify("error", "No backup sets defined. Check configuration.")
+      self:notify("error", "No action sets defined. Check configuration.")
    end
    -- process state file
    self:stateFileRead()
@@ -136,9 +136,9 @@ function obj:init()
    return self
 end
 
---- Backup:start()
+--- Action:start()
 --- Method
---- Start Backup.
+--- Start Action.
 ---
 --- Parameters:
 ---  * None
@@ -154,9 +154,9 @@ function obj:start()
    obj:updateMenuIcon()
 end
 
---- Backup:stop()
+--- Action:stop()
 --- Method
---- Stop Backup.
+--- Stop Action.
 ---
 --- Parameters:
 ---  * None
@@ -256,7 +256,7 @@ function obj:notify(kind, text)
    local msg = hs.notify.new(
       nil,
       {
-         title = "Backup Spoon",
+         title = "Action Spoon",
          informativeText = text,
          withdrawAfter = 0,
          setIdImage = ("error" == kind) and obj.notifyIconError or obj.notifyIconNormal
@@ -270,11 +270,11 @@ function obj:stateFileRead()
    -- reconcile the state file with the configuration
    for idxSet, set in ipairs(obj.sets) do
       if obj.state and obj.state[set.id] then
-         if obj.state[set.id].lastBackup then
-            set.lastBackup = obj.state[set.id].lastBackup
+         if obj.state[set.id].lastAction1 then
+            set.lastAction1 = obj.state[set.id].lastAction1
          end
-         if obj.state[set.id].lastPrune then
-            set.lastPrune = obj.state[set.id].lastPrune
+         if obj.state[set.id].lastAction2 then
+            set.lastAction2 = obj.state[set.id].lastAction2
          end
       end
    end
@@ -284,16 +284,16 @@ function obj:stateFileWrite()
    local fmt = "%Y-%m-%d (%a) %X" -- equivalent to "%H:%M:%S"
    local state = {}
    for idxSet, set in ipairs(obj.sets) do
-      local lb = set.lastBackup or os.time()
-      local lp = set.lastPrune or os.time()
+      local lb = set.lastAction1 or os.time()
+      local lp = set.lastAction2 or os.time()
       state[set.id] = {}
-      if "disabled" ~= set.intervals.backup then
-         state[set.id].lastBackup = lb
-         state[set.id].lastBackupStr = os.date(fmt, lb)
+      if "disabled" ~= set.intervals.action1 then
+         state[set.id].lastAction1 = lb
+         state[set.id].lastAction1Str = os.date(fmt, lb)
       end
-      if "disabled" ~= set.intervals.prune then
-         state[set.id].lastPrune = lp
-         state[set.id].lastPruneStr = os.date(fmt, lp)
+      if "disabled" ~= set.intervals.action2 then
+         state[set.id].lastAction2 = lp
+         state[set.id].lastAction2Str = os.date(fmt, lp)
       end
    end
    local res = hs.json.write(state, obj.conf.state_file, true, true)
