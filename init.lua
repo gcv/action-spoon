@@ -10,7 +10,7 @@ obj.__index = obj
 
 --- Metadata
 obj.name = "Action"
-obj.version = "0.0.0"
+obj.version = "1.0.0beta1"
 obj.author = "gcv"
 obj.homepage = "https://github.com/gcv/action.spoon"
 obj.license = "CC0"
@@ -68,8 +68,7 @@ function obj:init()
       return
    end
    -- version check
-   -- FIXME:
-   --self:versionCheck()
+   self:versionCheck()
    -- configure helper object prototypes
    Utils.app = self
    self.Utils = Utils
@@ -291,6 +290,37 @@ function obj:stateFileWrite()
    if not res then
       obj:notify("error", "Failed to write state file")
    end
+end
+
+function obj:versionCheck()
+   local versionUrl = "https://raw.githubusercontent.com/wiki/gcv/action-spoon/version.txt"
+   hs.http.asyncGet(
+      versionUrl,
+      nil,
+      function(status, body, resp)
+         if 200 ~= status then
+            -- whatever
+            return
+         end
+         local ver = body:gsub("[ \n]*$", "")
+         if ver ~= obj.version then
+            local n = hs.notify.new(
+               function()
+                  hs.osascript.applescript("open location \"https://github.com/gcv/action-spoon/releases\"")
+               end,
+               {
+                  title = "Action Spoon",
+                  informativeText = "New version available: " .. ver .. ".\nCurrently installed: " .. obj.version .. ".",
+                  withdrawAfter = 0,
+                  hasActionButton = true,
+                  actionButtonTitle = "Visit Page",
+                  setIdImage = obj.notifyIconNormal
+               }
+            )
+            n:send()
+         end
+      end
+   )
 end
 
 return obj
