@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+readlinkf() { perl -MCwd -MFile::Glob -l -e 'print Cwd::abs_path File::Glob::bsd_glob shift' "$1"; }
+basedir=$(dirname "$(readlinkf "$0")")
+script=$(basename "${BASH_SOURCE[${#BASH_SOURCE[@]}-1]}")
+
+if [[ ! $(command -v zip) ]]; then
+    echo "zip command not found" 1>&2
+    exit 1
+fi
+
+cd "${basedir}"
+mkdir .Action.spoon
+cd .Action.spoon
+cp -R ../* .
+cd ..
+mv .Action.spoon Action.spoon
+zip -9 --exclude "Action.spoon/make-package" --exclude "Action.spoon/hard-drive.afdesign" -r Action.spoon.zip Action.spoon
+rm -rf Action.spoon
+
+echo ""
+echo "- bump the version number in init.lua in obj.version AND Download header"
+echo "- upload the zip file to GitHub releases area"
+echo "- update action-spoon.wiki/version.txt"
