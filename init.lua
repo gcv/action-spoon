@@ -240,7 +240,7 @@ function obj:updateMenuIcon()
       end
    end
    if anyErrors and obj.menu:icon() ~= obj.menuIconError then
-      obj.menu:setIcon(obj.menuIconError, true)
+      obj.menu:setIcon(obj.menuIconError, false)
    elseif anyInterrupted and obj.menu:icon() ~= obj.menuIconInterrupted then
       obj.menu:setIcon(obj.menuIconInterrupted, false)
    elseif anyRunning and obj.menu:icon() ~= obj.menuIconRunning then
