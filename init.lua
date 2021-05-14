@@ -79,9 +79,13 @@ function obj:init()
    else
       self.conf.stateFile = hs.fs.pathToAbsolute(self.conf.stateFile)
    end
+   local spoonPathExtra = self.spoonPath .. "resources"
    if not self.conf.path then
-      self.conf.path = { "/bin", "/usr/bin", "/usr/local/bin" }
+      self.conf.path = { "/bin", "/usr/bin", "/usr/local/bin", spoonPathExtra }
+   else
+      self.conf.path = hs.fnutils.concat(self.conf.path, { spoonPathExtra })
    end
+   if self.conf.debug then print("ActionSpoon:", "path: ", hs.inspect(self.conf.path)) end
    if not self.conf.excludedSSIDs then
       self.conf.excludedSSIDs = {}
    end
