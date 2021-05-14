@@ -1,6 +1,6 @@
-* Backup Spoon — a Hammerspoon Plugin
+* Action Spoon — a Hammerspoon Plugin
 
-Backup Spoon (or Backup.spoon) is a [[http://www.hammerspoon.org/][Hammerspoon]] [[https://www.hammerspoon.org/Spoons/][plugin, or Spoon]], for orchestrating command-line backup utilities like [[https://restic.net/][restic]], [[https://www.borgbackup.org/][Borg]], and [[https://kopia.io][Kopia]]. These utilities can even be configured to run simultaneously to provide extra redundancy, since all have been known to have [[https://forum.restic.net/t/recovery-options-for-damaged-repositories/1571][data-loss]] bugs.
+Action Spoon (or Action.spoon, formerly Backup Spoon) is a [[http://www.hammerspoon.org/][Hammerspoon]] [[https://www.hammerspoon.org/Spoons/][plugin, or Spoon]], for orchestrating command-line utilities to run on a schedule. It was originally designed for backup tools like [[https://restic.net/][restic]], [[https://www.borgbackup.org/][Borg]], and [[https://kopia.io][Kopia]]. With Action Spoon, these utilities can even be configured to run simultaneously to provide extra redundancy, since all have been known to have [[https://forum.restic.net/t/recovery-options-for-damaged-repositories/1571][data-loss]] bugs.
 
 
 ** Tasks
@@ -12,13 +12,13 @@ Backup Spoon (or Backup.spoon) is a [[http://www.hammerspoon.org/][Hammerspoon]]
 
 ** Installation
 
-- Install your backup utility of choice.
-- Download the latest release zip file from https://github.com/gcv/backup-spoon/releases/.
+- Install your CLI (e.g. backup) utilities.
+- Download the latest release zip file from https://github.com/gcv/action-spoon/releases/.
 - Open the downloaded file, and Hammerspoon will automatically install it.
 - Edit your Hammerspoon configuration file (~~/.hammerspoon/init.lua~), and add the following line:
 
 #+BEGIN_SRC lua
-hs.loadSpoon("Backup")
+hs.loadSpoon("Action")
 #+END_SRC
 
 After editing the configuration file (see below), reload the Hammerspoon configuration.
