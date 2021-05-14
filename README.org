@@ -3,13 +3,6 @@
 Action Spoon (or Action.spoon, formerly Backup Spoon) is a [[http://www.hammerspoon.org/][Hammerspoon]] [[https://www.hammerspoon.org/Spoons/][plugin, or Spoon]], for orchestrating command-line utilities to run on a schedule. It was originally designed for backup tools like [[https://restic.net/][restic]], [[https://www.borgbackup.org/][Borg]], and [[https://kopia.io][Kopia]]. With Action Spoon, these utilities can even be configured to run simultaneously to provide extra redundancy, since all have been known to have [[https://forum.restic.net/t/recovery-options-for-damaged-repositories/1571][data-loss]] bugs.
 
 
-** Tasks
-
-- [ ] get it working
-- [ ] adjust icon size, it's currently too big?
-- [ ] get Restic and Kopia both working
-
-
 ** Installation
 
 - Install your CLI (e.g. backup) utilities.
@@ -24,11 +17,138 @@ hs.loadSpoon("Action")
 After editing the configuration file (see below), reload the Hammerspoon configuration.
 
 
+** Concepts
+
+FIXME
+
+- sets
+- actions
+- commands
+- intervals
+
+
 ** Configuration
 
-*** S3 infrequent access policy
+Make sure whatever CLI tools you want to use with Action Spoon are correctly configured and work from the command line non-interactively (i.e., without prompting the user for any input).
 
-Kopia: blobs starting with ~p~ can be marked infrequent for savings (https://kopia.discourse.group/t/using-s3-infrequent-access-policies/187/2).
+Add a file to your ~XDG_CONFIG_HOME~ directory (probably ~~./config~) named ~ActionSpoon.lua~. An example configuration file looks like this:
+
+FIXME
+
+#+begin_src lua
+
+#+end_src
 
 
 ** Usage
+
+- Action Spoon displays a menu icon when running.
+- Clicking the menu icon shows the list of sets. There should be a status icon next to each.
+
+| status icon | meaning                |
+|-------------+------------------------|
+| ✓           | set task succeeded     |
+| !           | error                  |
+| ⟳           | set task in progress   |
+| ×           | set task stopped       |
+| •           | waiting for set action |
+
+- The menu icon turns grey when disabled.
+- The menu icon turns red when an error affects at least one set. When this happens, look for messages on the Hammerspoon console.
+- The menu icon turns orange when a task has been interrupted.
+- Set timers will be suspended when the system goes into sleep mode.
+- After editing the configuration file, reload the Hammerspoon configuration, either from the Hammerspoon console or with a dedicated key binding to ~hs.reload()~.
+
+
+** Notes
+
+*** Restic: reasonable commands for S3 backups
+
+Set ~RESTIC_PASSWORD_COMMAND~ to something reasonable, e.g., something like this for retrieving the password from the Keychain:
+
+#+begin_src shell
+/usr/bin/security find-generic-password -s 'My Restic Backup' -w
+#+end_src
+
+Set ~AWS_ACCESS_KEY_ID~, ~AWS_SECRET_ACCESS_KEY~, and ~AWS_DEFAULT_REGION~ appropriately.
+
+As an alternative to passing ~--repo~ options to all these commands, consider setting ~RESTIC_REPOSITORY~. (Naturally, this only makes sense if you don't use different repositories.)
+
+
+**** Initialize
+
+#+begin_src shell
+restic \
+    --repo=s3:s3.amazonaws.com/<bucket>/<path> \
+    init
+#+end_src
+
+
+**** Backup
+
+#+begin_src shell
+restic \
+    --repo=s3:s3.amazonaws.com/<bucket>/<path> \
+    --limit-upload=950 \
+    --option=s3.storage-class=STANDARD_IA \
+    --quiet \
+    backup
+#+end_src
+
+
+**** Prune
+
+#+begin_src shell
+restic \
+    --repo=s3:s3.amazonaws.com/<bucket>/<path> \
+    forget --prune \
+    --max-unused=unlimited \
+    --keep-last=100 \
+    --keep-hourly=72 \
+    --keep-daily=60 \
+    --keep-weekly=12 \
+    --keep-monthly=36 \
+    --keep-yearly=100
+#+end_src
+
+
+**** List snapshots
+
+#+begin_src shell
+restic \
+    --repo=s3:s3.amazonaws.com/<bucket>/<path> \
+    snapshots
+#+end_src
+
+
+**** List files in snapshot
+
+Substitute snapshot ID for ~latest~ below as needed.
+
+#+begin_src shell
+restic \
+    --repo=s3:s3.amazonaws.com/<bucket>/<path> \
+    ls latest
+#+end_src
+
+
+**** Retrieve files from snapshot
+
+#+begin_src shell
+restic \
+    --repo=s3:s3.amazonaws.com/<bucket>/<path> \
+    restore latest \
+    --include="/<path in snapshot>/*" \
+    --target="/<path to restore location>"
+#+end_src
+
+
+*** Kopia: S3 infrequent access policy
+
+Blobs starting with ~p~ can be marked infrequent for savings (https://kopia.discourse.group/t/using-s3-infrequent-access-policies/187/2).
+
+
+** Credits
+
+- This evolved from my [[https://github.com/gcv/git-sync-spoon][Git Sync Spoon]] project.
+- This would not have been possible without the [[http://www.hammerspoon.org/][Hammerspoon]] platform.
