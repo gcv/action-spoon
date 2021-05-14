@@ -29,6 +29,7 @@ local Set = dofile(obj.spoonPath .. "/set.lua")
 --- Internal state:
 obj.confFile = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/ActionSpoon.lua"
 obj.conf = setmetatable({}, {__index=_G}) -- XXX: Allow function calls in conf file! @@
+obj.conf.debug = false                    -- XXX: This inherits a debug field! @@
 obj.state = {}
 obj.sets = {}
 obj.active = false
@@ -97,9 +98,6 @@ function obj:init()
    end
    if not self.conf.intervals.poll then
       self.conf.intervals.poll = 5 * 60 -- 5 minutes
-   end
-   if not self.conf.debug then
-      self.conf.debug = false
    end
    -- process root environment variables
    self.conf.env = Utils.readEnvs(self.conf.environment)
@@ -180,13 +178,16 @@ function obj:makeMenuTable()
       end
    end
    res[#res+1] = { title = "-" }
-   res[#res+1] = {
-      title = "Debug...",
-      fn = function()
-         print("State:", hs.inspect(obj.state))
-         print("Sets:", hs.inspect(obj.sets))
-      end
-   }
+   if obj.conf.debug then
+      res[#res+1] = {
+         title = "Debug...",
+         fn = function()
+            print("Configuration: ", hs.inspect(obj.conf))
+            print("State: ", hs.inspect(obj.state))
+            print("Sets: ", hs.inspect(obj.sets))
+         end
+      }
+   end
    if obj.active then
       res[#res+1] = {
          title = "Disable",
