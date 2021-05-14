@@ -126,6 +126,10 @@ function obj:helper(idxAction, idxCmd)
       )
       local taskEnv = self.app.Utils.merge(self.task:environment(), self.env)
       self:updateStatus("running")
+      self.task:setEnvironment(taskEnv)
+      local directory = hs.fs.pathToAbsolute(entry.directory or self.directory or self.app.conf.directory or self.app.spoonPath)
+      if self.app.conf.debug then print("ActionSpoon:", "working directory:", directory) end
+      self.task:setWorkingDirectory(directory)
       self.task:start()
    end
 end
