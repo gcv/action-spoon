@@ -42,7 +42,8 @@ function obj:stop()
 end
 
 function obj:startCommand(idxCmd)
-   local nextAction = (self.lastActions[idxCmd] or os.time()) + self.intervals.commands[idxCmd] - os.time()
+   self.lastActions[idxCmd] = self.lastActions[idxCmd] or os.time()
+   local nextAction = self.lastActions[idxCmd] + self.intervals.commands[idxCmd] - os.time()
    -- if nextAction is in the past (i.e., < 0), then set it to run a minute from now
    if nextAction <= 0 then
       nextAction = 60
