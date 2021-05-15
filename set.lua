@@ -126,14 +126,16 @@ function obj:helper(idxAction, idxCmd)
          splits -- rest of the args
       )
       local taskEnv = self.app.Utils.merge(self.task:environment(), self.env)
-      taskEnv["PATH"] =
-         ((taskEnv["PATH"] .. ":") or "") ..
-         table.concat(self.app.Utils.map(
-                         function (pe)
-                            return hs.fs.pathToAbsolute(pe)
-                         end,
-                         self.app.conf.path),
-                      ":")
+      local pathToAdd = table.concat(
+         self.app.Utils.map(
+            function (pe)
+               return hs.fs.pathToAbsolute(pe)
+            end,
+            self.app.conf.path),
+         ":")
+      if not string.find(taskEnv["PATH"], pathToAdd) then
+         taskEnv["PATH"] = ((taskEnv["PATH"] .. ":") or "") .. pathToAdd
+      end
       if self.app.conf.debug then print("ActionSpoon:", "task path: " .. hs.inspect(taskEnv["PATH"])) end
       self:updateStatus("running")
       self.task:setEnvironment(taskEnv)

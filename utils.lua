@@ -6,8 +6,9 @@ function obj.findExecutable(name)
    if candidate then
       return hs.fs.pathToAbsolute(name)
    end
-   local path = hs.fnutils.concat(obj.app.conf.path, {"/usr/bin", "/bin"})
-   for idx, entry in ipairs(obj.app.conf.path) do
+   local path = hs.fnutils.copy(obj.app.conf.path)
+   hs.fnutils.concat(path, {"/usr/bin", "/bin"}) -- XXX: destructive!
+   for idx, entry in ipairs(path) do
       candidate = hs.fs.displayName(entry .. "/" .. name)
       if candidate then
          return hs.fs.pathToAbsolute(entry .. "/" .. name)
