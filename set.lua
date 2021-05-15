@@ -112,7 +112,7 @@ function obj:helper(idxAction, idxCmd)
                   end
                else
                   -- always print errors to console, regardless of debug flag
-                  print("ActionSpoon:", "task failed, code: " .. code .. ", stderr:" .. stderr)
+                  print("ActionSpoon:", "task failed: " .. self.id .. " : " .. entry.id .. "; code: " .. code .. ", stderr:" .. stderr)
                   self.app:notify("error", "Task failed: " .. self.id .. ", " .. entry.id)
                   self:updateStatus("error")
                end
