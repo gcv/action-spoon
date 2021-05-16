@@ -19,12 +19,9 @@ After editing the configuration file (see below), reload the Hammerspoon configu
 
 ** Concepts
 
-FIXME
+Action Spoon organizes things it runs into /sets/. Each set contains one or more /actions/, and each action has one or more /commands/. Every action in a set must have the same number of commands. Sets can run in parallel, but actions within a set run sequentially, subject to defined /intervals/.
 
-- sets
-- actions
-- commands
-- intervals
+An easy example for the backup use case could be a configuration of two named backup sets: ~Data~ and ~Media~. The ~Data~ backup set has one action named ~Quotes~, and the ~Media~ backup set has two: ~Photos~ and ~Audio~. Each action defines two commands: ~backup~ (which runs on an hourly interval) and ~prune~ (which runs on a monthly interval). Backups for ~Data~ and ~Media~ can run in parallel, but ~Media:Photos~ and ~Media:Audio~ will only run sequentially.
 
 
 ** Configuration
@@ -32,8 +29,6 @@ FIXME
 Make sure whatever CLI tools you want to use with Action Spoon are correctly configured and work from the command line non-interactively (i.e., without prompting the user for any input).
 
 Add a file to your ~XDG_CONFIG_HOME~ directory (probably ~~./config~) named ~ActionSpoon.lua~. An example configuration file looks like this:
-
-FIXME
 
 #+begin_src lua
 
@@ -92,7 +87,7 @@ restic \
     --limit-upload=950 \
     --option=s3.storage-class=STANDARD_IA \
     --quiet \
-    backup
+    backup /<path to source>
 #+end_src
 
 
@@ -101,6 +96,7 @@ restic \
 #+begin_src shell
 restic \
     --repo=s3:s3.amazonaws.com/<bucket>/<path> \
+    --quiet
     forget --prune \
     --max-unused=unlimited \
     --keep-last=100 \
