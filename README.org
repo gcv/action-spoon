@@ -28,7 +28,38 @@ An easy example for the backup use case could be a configuration of two named ba
 
 Make sure whatever CLI tools you want to use with Action Spoon are correctly configured and work from the command line non-interactively (i.e., without prompting the user for any input).
 
-Add a file to your ~XDG_CONFIG_HOME~ directory (probably ~~./config~) named ~ActionSpoon.lua~. An example configuration file looks like this:
+Add a file to your ~XDG_CONFIG_HOME~ directory (probably ~~./config~) named ~ActionSpoon.lua~. A simple configuration file looks like this:
+
+#+begin_src lua
+sets = {
+   id = "Health",
+   intervals = {
+      commands = {
+         15 * 60,
+         40 * 60
+      }
+   },
+   actions = {
+      {
+         id = "Relax!",
+         commands = {
+            -- a command defined as a Lua function:
+            function ()
+               hs.notify.show(
+                  "Relax reminder 1",
+                  "Breathe...",
+                  "..."
+               )
+            end,
+            -- a command calling an external utility:
+            {"osascript", "-e", "display notification \"Take a moment to stretch and walk around.\" with title \"Relax reminder 2\""}
+         }
+      }
+   }
+}
+#+end_src
+
+A more sophisticated example:
 
 #+begin_src lua
 
