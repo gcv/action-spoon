@@ -1,11 +1,11 @@
 * Action Spoon — a Hammerspoon Plugin
 
-Action Spoon (or Action.spoon, formerly Backup Spoon) is a [[http://www.hammerspoon.org/][Hammerspoon]] [[https://www.hammerspoon.org/Spoons/][plugin, or Spoon]], for orchestrating command-line utilities to run on a schedule. It was originally designed for backup tools like [[https://restic.net/][restic]], [[https://www.borgbackup.org/][Borg]], and [[https://kopia.io][Kopia]]. With Action Spoon, these utilities can even be configured to run simultaneously to provide extra redundancy, since all have been known to have [[https://forum.restic.net/t/recovery-options-for-damaged-repositories/1571][data-loss]] bugs.
+Action Spoon (or Action.spoon, formerly Backup Spoon) is a [[http://www.hammerspoon.org/][Hammerspoon]] [[https://www.hammerspoon.org/Spoons/][plugin, or Spoon]], for orchestrating command-line utilities to run on a schedule. It was originally designed to handle timer-scheduled runs of backup tools like [[https://restic.net/][restic]], [[https://www.borgbackup.org/][Borg]], and [[https://kopia.io][Kopia]]. With Action Spoon, these utilities can even be configured to run simultaneously to provide extra redundancy, since all have been known to have [[https://forum.restic.net/t/recovery-options-for-damaged-repositories/1571][data-loss]] bugs.
 
 
 ** Installation
 
-- Install your CLI (e.g. backup) utilities.
+- Install your CLI (e.g. backup) utilities. (You should use Nix.)
 - Download the latest release zip file from https://github.com/gcv/action-spoon/releases/.
 - Open the downloaded file, and Hammerspoon will automatically install it.
 - Edit your Hammerspoon configuration file (~~/.hammerspoon/init.lua~), and add the following line:
@@ -14,7 +14,7 @@ Action Spoon (or Action.spoon, formerly Backup Spoon) is a [[http://www.hammersp
 hs.loadSpoon("Action")
 #+END_SRC
 
-After editing the configuration file (see below), reload the Hammerspoon configuration.
+Make and edit the Action Spoon configuration file (see below), and reload the Hammerspoon configuration.
 
 
 ** Concepts
@@ -27,6 +27,8 @@ An easy example for the backup use case could be a configuration of two named ba
 ** Configuration
 
 Make sure whatever CLI tools you want to use with Action Spoon are correctly configured and work from the command line non-interactively (i.e., without prompting the user for any input).
+
+For backup tools, it's a good idea to run the initial backup before setting it up with Action Spoon.
 
 Add a file to your ~XDG_CONFIG_HOME~ directory (probably ~~./config~) named ~ActionSpoon.lua~. A simple configuration file looks like this:
 
@@ -59,16 +61,190 @@ sets = {
 }
 #+end_src
 
+Set IDs should be unique.
+
+Note that a command can be a Lua function (which has access to the Hammerspoon runtime!), or a command-line invocation. For technical reasons (related to argument quoting), CLI invocations must be written as arrays (Lua tables) of strings, where each entry is a separate token in the command.
+
 A more sophisticated example:
 
 #+begin_src lua
+enabled = true
+-- default:
+--stateFile = "~/.config/ActionSpoon-state.json"
+path = { "~/.nix-profile/bin" }
+-- default is debug = false, but enabling it might be useful:
+--debug = true
 
+
+-- global settings; can be modified per set:
+excludedSSIDs = { ".*iPhone" }
+
+intervals = {             -- defaults for all sets:
+   poll = 5 * 60,         -- 5 minutes, default
+   commands = {
+      60 * 60,            -- backup: 1 hour, overridable at set level
+      30 * 24 * 60 * 60   -- prune: 30 day, overridable at set level
+   }
+}
+
+environment = {
+   {
+      var = "RESTIC_PASSWORD_COMMAND",
+      value = "/usr/bin/security find-generic-password -s 'My Restic Backup' -w"
+   },
+   {
+      var = "AWS_ACCESS_KEY_ID",
+      command = {"aws", "configure", "--profile=my-profile", "get", "aws_access_key_id"}
+   },
+   {
+      var = "AWS_SECRET_ACCESS_KEY",
+      command = {"aws", "configure", "--profile=my-profile", "get", "aws_secret_access_key"} },
+   {
+      var = "AWS_DEFAULT_REGION",
+      value = "eu-west-1"
+   }
+}
+
+
+-- main part:
+sets = {
+
+   {
+      id = "Data",
+      actions = {
+         {
+            id = "Quotes",
+            commands = {
+               -- backup:
+               {"restic",
+                "--repo=s3:s3.amazonaws.com/<backup-bucket>/restic/Quotes",
+                "--limit-upload=4900", -- KiB/s approx 5 MB/s
+                "--option=s3.storage-class=STANDARD_IA",
+                "--quiet",
+                "backup",
+                "/Users/gcv/Data/Quotes"},
+               -- prune:
+               {"restic",
+                "--repo=s3:s3.amazonaws.com/<backup-bucket>/restic/Quotes",
+                "--quiet",
+                "forget",
+                "--prune",
+                "--max-unused=unlimited",
+                "--keep-last=100",
+                "--keep-hourly=72",
+                "--keep-daily=60",
+                "--keep-weekly=12",
+                "--keep-monthly=36",
+                "--keep-yearly=100"}
+            }
+         }
+      }
+   },
+
+   {
+      id = "Media",
+      -- override intervals:
+      intervals = {
+         commands = {
+            6 * 60 * 60,       -- backup: 6 hours
+            30 * 24 * 60 * 60  -- prune: 30 days
+         }
+      },
+      actions = {
+         {
+            id = "Audio",
+            commands = {
+               -- backup:
+               {"restic",
+                "--repo=s3:s3.amazonaws.com/<backup-bucket>/restic/Audio",
+                "--limit-upload=4900", -- KiB/s approx 5 MB/s
+                "--option=s3.storage-class=STANDARD_IA",
+                "--quiet",
+                "backup",
+                "/Users/gcv/Audio"},
+               -- prune:
+               {"restic",
+                "--repo=s3:s3.amazonaws.com/<backup-bucket>/restic/Audio",
+                "--quiet",
+                "forget",
+                "--prune",
+                "--max-unused=unlimited",
+                "--keep-last=100",
+                "--keep-hourly=72",
+                "--keep-daily=60",
+                "--keep-weekly=12",
+                "--keep-monthly=36",
+                "--keep-yearly=100"}
+            }
+         },
+         {
+            id = "Photos",
+            commands = {
+               -- backup:
+               {"restic",
+                "--repo=s3:s3.amazonaws.com/<backup-bucket>/restic/Photos",
+                "--limit-upload=4900", -- KiB/s approx 5 MB/s
+                "--option=s3.storage-class=STANDARD_IA",
+                "--quiet",
+                "backup",
+                "/Users/gcv/Photos"},
+               -- prune:
+               {"restic",
+                "--repo=s3:s3.amazonaws.com/<backup-bucket>/restic/Photos",
+                "--quiet",
+                "forget",
+                "--prune",
+                "--max-unused=unlimited",
+                "--keep-last=100",
+                "--keep-hourly=72",
+                "--keep-daily=60",
+                "--keep-weekly=12",
+                "--keep-monthly=36",
+                "--keep-yearly=100"}
+            }
+         }
+      }
+   },
+
+   {
+      id = "Git Sync",
+      intervals = {
+         commands = { 4 * 60 }
+      },
+      environment = {
+         {
+            var = "GIT_SYNC_EXCLUDES",
+            value = "Books/Novel-1"
+         }
+      },
+      actions = {
+         {
+            id = "Writing",
+            -- set the working directory of the command:
+            directory = "~/Writing",
+            commands = {
+               {"git-sync"}
+            }
+         }
+      }
+   }
+
+}
 #+end_src
+
+
+*** Notes
+
+- Environment variables can be set with either constant values, or to the result of running a command.
+- Environment variables can be overriden at the set level. They are merged with environment variables set at the higher configuration level.
+- ~poll~: this interval setting controls how frequently an attempt is made to run an action when another action in the same is running. For example, when doing a prune, it is bad to run a backup on the same directory. So when the prune and backup are configured as sibling commands on the same action, and one is scheduled to run while the other is still running, the one will sleep for ~poll~ seconds before attempting again.
+- Intervals are given in seconds.
+- [[https://github.com/gcv/git-sync-spoon][Git Sync Spoon]] compatibility: Action Spoon contains the full functionality of Git Sync Spoon. It includes the ~git-sync~ script, which can be used in a CLI invocation directly.
 
 
 ** Usage
 
-- Action Spoon displays a menu icon when running.
+- Action Spoon displays a menu icon when enabled.
 - Clicking the menu icon shows the list of sets. There should be a status icon next to each.
 
 | status icon | meaning                |
@@ -82,7 +258,8 @@ A more sophisticated example:
 - The menu icon turns grey when disabled.
 - The menu icon turns red when an error affects at least one set. When this happens, look for messages on the Hammerspoon console.
 - The menu icon turns orange when a task has been interrupted.
-- Set timers will be suspended when the system goes into sleep mode.
+- The menu icon shows flashing hard drive activity lights while running a command.
+- Set timers will be suspended when the system goes into sleep mode. When the system wakes up, Action Spoon will honor the expected interval. (This means if the defined run time of an action will have occured while the system was asleep, the action will be scheduled to run in 1 minute.)
 - After editing the configuration file, reload the Hammerspoon configuration, either from the Hammerspoon console or with a dedicated key binding to ~hs.reload()~.
 
 
