@@ -62,7 +62,7 @@ end
 function obj:goCommand(idxCmd)
    if self.app.conf.debug then print("ActionSpoon:", "command[" .. idxCmd .. "] trigger for set '" .. self.id .. "'") end
    -- avoid simultaneous runs! try again in <poll> min
-   local isRunning = "running" == self.status
+   local isRunning = ("running" == self.status)
    local currentSSID = hs.wifi.currentNetwork()
    local isExcludedSSID = false
    for idxSSID, rxSSID in ipairs(self.excludedSSIDs) do

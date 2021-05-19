@@ -239,12 +239,18 @@ function obj:updateMenuIcon()
          anyRunning = true
       end
    end
-   if anyErrors and obj.menu:icon() ~= obj.menuIconError then
-      obj.menu:setIcon(obj.menuIconError, false)
-   elseif anyInterrupted and obj.menu:icon() ~= obj.menuIconInterrupted then
-      obj.menu:setIcon(obj.menuIconInterrupted, false)
-   elseif anyRunning and obj.menu:icon() ~= obj.menuIconRunning then
-      obj.menu:setIcon(obj.menuIconRunning, true)
+   if anyErrors then
+      if obj.menu:icon() ~= obj.menuIconError then
+         obj.menu:setIcon(obj.menuIconError, false)
+      end
+   elseif anyInterrupted then
+      if obj.menu:icon() ~= obj.menuIconInterrupted then
+         obj.menu:setIcon(obj.menuIconInterrupted, false)
+      end
+   elseif anyRunning then
+      if obj.menu:icon() ~= obj.menuIconRunning then
+         obj.menu:setIcon(obj.menuIconRunning, true)
+      end
    elseif obj.menu:icon() ~= obj.menuIconNormal then
       obj.menu:setIcon(obj.menuIconNormal, true)
    end
